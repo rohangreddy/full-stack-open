@@ -1,57 +1,105 @@
 // Define componenet that logs to console and then returns html div element with hello world paragraph
 
-const App = () => {
-  const course = 'Half Stack application development'
-  const part1 = 'Fundamentals of React'
-  const exercises1 = 10
-  const part2 = 'Using props to pass data'
-  const exercises2 = 7
-  const part3 = 'State of a component'
-  const exercises3 = 14
-
-  return (
-    <div>
-      <h1>{course}</h1>
-      <p>
-        {part1} {exercises1}
-      </p>
-      <p>
-        {part2} {exercises2}
-      </p>
-      <p>
-        {part3} {exercises3}
-      </p>
-      <p>Number of exercises {exercises1 + exercises2 + exercises3}</p>
-    </div>
-  )
+const Header = (props) => {
+	return (
+		<h1>{props.course.name}</h1>
+	)
 }
 
-export default App
+const Content = (props) => {
+	console.log(props)
+	let parts = props.parts.map(value => <p key={value.name}> {value.name} {value.exercises}</p>)
+	return (
+		<>
+			{parts}
+		</>
+	)
+}
+
+const Total = (props) => {
+	let totals = props.parts.reduce(
+		(sum, value) => sum + value.exercises, 0
+	)
+	return (
+		<>
+			<p>Number of exercises {totals}</p>
+		</>
+	)
+}
+
+// const App = () => {
+
+//   let parts = [
+// 	{name: 'Fundamentals of React', exercises: 10},
+// 	{name: 'Using props to pass data', exercises: 7},
+// 	{name: 'State of a component', exercises: 14},
+//   ]
+//   const course = {
+// 	name: 'Half Stack application development',
+// 	parts: parts
+//   }
+
   
-//{
-//   const course = 'Half Stack Application Development'
-//   const part1 = {
-//     name: 'Fundamentals of React',
-//     exercises: 10
-//   }
-//   const part2 = {
-//     name: 'Using props to pass data',
-//     exercises: 7
-//   }
-//   const part3 = {
-//     name: 'State of a component',
-//     exercises: 14
-//   }
-
-//   const parts = [part1, part2, part3]
-
 //   return (
-//     <div>
-//       <Header course={course}/>
-//       <Content parts={parts}/>
-//       <Total parts={parts} />
+// 	<div>
+// 		<Header course={course}></Header>
+// 		<Content parts={course.parts}></Content>
+// 		<Total parts={course.parts}></Total>
 //     </div>
 //   )
 // }
 
-// export default App
+// Destructuring to pass variables directly rather than props
+// const Hello = ({ name, age }) => {
+// 	// Destructuring to easily extract variables
+// 	// const { name, age } = props
+
+// 	const bornYear = () => new Date().getFullYear() - age
+// 	return (
+// 		<div>
+// 			<p> Hello {name}, you are {age} years old</p>
+// 			<p>So you were probably born in {bornYear()}</p>
+// 		</div>
+// 	)
+// }
+
+// const App = () => {
+
+//   const name = 'Rohan'
+//   const age = 10
+
+  
+//   return (
+//     <div>
+//       <h1>Greetings</h1>
+//       <Hello name="Maya" age={26 + 10} />
+//       <Hello name={name} age={age} />
+//     </div>
+//   )
+// }
+
+
+// Page Re-rendering
+// const App = (props) => {
+//   const {counter} = props
+//   return (
+//     <div>{counter}</div>
+//   )
+// }
+
+// The proper way to pass state into components 
+import { useState } from 'react'
+
+const App = () => {
+	const [ count, setCount ] = useState(0)
+
+	setTimeout(
+		() => setCount(count+1),
+		1000
+	)
+
+	return (
+    	<div>{count}</div>
+  	)
+}
+export default App
