@@ -1,16 +1,20 @@
-const Person = ({ person }) => {
+const Person = ({ person, handleClick }) => {
     return (
-        <p>{person.name} {person.number}</p>
+        <div>
+            <p>{person.name} {person.number} <button onClick={handleClick}>Delete</button> </p>
+        </div>
     )
 }
 
-const People = ({people, filter}) => {
+const People = ({people, filter, handleClick}) => {
     return (
         <div>
             {
-                filter ? people.filter(person => person.name === filter).map(person => <Person key={person.name} person={person} />) : people.map(person => <Person key={person.name} person={person} />)
+                filter 
+                ? people.filter(person => person.name === filter).map(person => <Person key={person.id} person={person} handleClick={() => handleClick(person.id)} />) 
+                : people.map(person => <Person key={person.id} person={person} handleClick={() => handleClick(person.id)}/>)
             }
-      </div>
+        </div>
     )
 }
 
