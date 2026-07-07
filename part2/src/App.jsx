@@ -1,6 +1,7 @@
 import Note from './components/Note'
 import { useState, useEffect } from 'react'
 import axios from 'axios'
+import noteService from './services/notes'
 
 const App = (props) => {
 
@@ -21,6 +22,12 @@ const App = (props) => {
   // A well-chosen key helps React infer what exactly has happened, and make the correct updates to the DOM tree.
 
   const [notes, setNotes] = useState([])
+  // Controlled components are a way to access data contained in the form's input element
+  // In the first iteration where we set newNote to input value, React doesn't allow edits because we haven't defined what to do when the input changes
+  const [newNote, setNewNote] = useState(
+    'a new note...'
+  )
+  const [showAll, setShowAll] = useState(true)
 
   // Effects let a component connect to and synchronize with external system
   // By default, effect is always run after the component has been rendered
@@ -33,36 +40,48 @@ const App = (props) => {
     // such that when the data arrives from the server, JS runtime calls the function registered as the event handler
     // and stores the notes received rom the server into the state using setNotes
     // Finally, a call to the state-updating function triggers re-rendering of the component
-    axios
-      .get('http://localhost:3001/notes')
-      .then(response => {
-        console.log('promise fulfilled')
-        setNotes(response.data)
+    noteService
+      .getAll()
+      .then(initialNotes => {
+        setNotes(initialNotes)
       })
   }
 
   // first parameter is a function (effect)
   // second parameter specifies how often the effect should run (if [], effect is only run with the first render of the component)
   useEffect(hook, [])
-    
-  console.log(`rendered ${notes.length} notes`)
 
-  // Controlled components are a way to access data contained in the form's input element
-  // In the first iteration where we set newNote to input value, React doesn't allow edits because we haven't defined what to do when the input changes
-  const [newNote, setNewNote] = useState(
-    'a new note...'
-  )
-  const [showAll, setShowAll] = useState(true)
+  // allows patching the note object
+  const toggleImportanceOf = (id) => {
+    console.log(`importance of ${id} needs to be toggled`)
+    const note = notes.find(note => note.id === id)
+    const changedNote = { ...note, important: !note.important}
+    noteService
+    .update(id, changedNote)
+    .then(updatedNote => {
+      setNotes(notes.map(note => note.id === id ? updatedNote : note))
+    })
+    .catch(error => {
+      alert(
+        `the note '${note.content}' was already deleted from server`
+      )
+      setNotes(notes.filter(n => n.id !== id))
+    })
+  }
 
   const addNote = (event) => {
     event.preventDefault()
     const newNoteObj = {
       content: newNote,
-      important: Math.random() < 0.5,
-      id: String(notes.length + 1)
+      important: Math.random() < 0.5
     }
-    setNotes(notes.concat(newNoteObj))
-    setNewNote('')
+    noteService
+    .create(newNoteObj)
+    .then(createdNote => {
+      setNotes(notes.concat(createdNote))
+      setNewNote('')
+    })
+    
   }
   
 
@@ -79,19 +98,20 @@ const App = (props) => {
     ? notes
     : notes.filter(note => note.important === true)
 
+  // Notice how every note gets it's own unique event handler since the id of every note is unique
   return (
     <div>
       <h1>Notes</h1>
       <ul>
         {notesToShow.map(note => 
-          <Note key={note.id} note={note}/>
+          <Note key={note.id} note={note} toggleImportance={() => toggleImportanceOf(note.id)}/>
         )}
       </ul>
       <form onSubmit={addNote}>
         <input value={newNote} onChange={handleNoteChange}/>
         <button type="submit">save</button>
       </form>
-      <button onClick={handleShowAll}>Show {showAll ? 'All' : 'Important'}</button>
+      <button onClick={handleShowAll}>Show {showAll ? 'Important' : 'All'}</button>
     </div>
   )
 }
