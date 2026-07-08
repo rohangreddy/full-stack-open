@@ -30,7 +30,7 @@ const App = () => {
       personService
       .createPerson(newPerson)
       .then(addedPerson => {
-        setPeople(people.concat(newPerson))
+        setPeople(people.concat(addedPerson))
       })
     }
     setNewName('')
