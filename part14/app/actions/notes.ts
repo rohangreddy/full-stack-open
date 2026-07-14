@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation"
 import { addNote } from "../services/notes"
+import { revalidatePath } from "next/cache"
 
 // When next.js compiles tha pplication, it detects every function marked with
 // "useServer" and generates a unique HTTP endpoint for each one
@@ -26,5 +27,6 @@ export const createNote = async (formData: FormData) => {
   // and updates view without full page reload
 
   // Transition is faster and smoother since Next.js handles it as client-side navigation under the hood
+  revalidatePath("/notes")
   redirect("/notes")
 }
