@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Next.js and Route Handlers — FSO Part 3</title>
+</head>
+<body>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --ink: #14171c;
+    --ink-muted: #4b5563;
+    --ink-faint: #7d8592;
+    --border: #dde1e7;
+    --accent: #3454d1;
+    --accent-ink: #1f3aa8;
+    --accent-soft: #eef1fc;
+    --code-bg: #1c1f26;
+    --code-ink: #e6e8ee;
+    --code-comment: #8892a6;
+    --express-bg: #fff6ea;
+    --express-border: #edc98c;
+    --express-ink: #6b4a12;
+    --next-bg: #eaf1ff;
+    --next-border: #b9cdfa;
+    --next-ink: #1f3aa8;
+    --warn-bg: #fdeeee;
+    --warn-border: #e8b4b4;
+    --warn-ink: #8a2b2b;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115;
+      --surface: #171a20;
+      --ink: #e7e9ee;
+      --ink-muted: #9aa3b2;
+      --ink-faint: #6b7280;
+      --border: #2a2e37;
+      --accent: #7fa0ff;
+      --accent-ink: #b7c8ff;
+      --accent-soft: #1a2236;
+      --code-bg: #0b0d11;
+      --code-ink: #d7dbe3;
+      --code-comment: #6b7385;
+      --express-bg: #241d12;
+      --express-border: #5a4322;
+      --express-ink: #e3bf7f;
+      --next-bg: #16233a;
+      --next-border: #33507a;
+      --next-ink: #b7c8ff;
+      --warn-bg: #2a1717;
+      --warn-border: #6b2f2f;
+      --warn-ink: #f0b4b4;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #0f1115;
+    --surface: #171a20;
+    --ink: #e7e9ee;
+    --ink-muted: #9aa3b2;
+    --ink-faint: #6b7280;
+    --border: #2a2e37;
+    --accent: #7fa0ff;
+    --accent-ink: #b7c8ff;
+    --accent-soft: #1a2236;
+    --code-bg: #0b0d11;
+    --code-ink: #d7dbe3;
+    --code-comment: #6b7385;
+    --express-bg: #241d12;
+    --express-border: #5a4322;
+    --express-ink: #e3bf7f;
+    --next-bg: #16233a;
+    --next-border: #33507a;
+    --next-ink: #b7c8ff;
+    --warn-bg: #2a1717;
+    --warn-border: #6b2f2f;
+    --warn-ink: #f0b4b4;
+  }
+
+  :root[data-theme="light"] {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --ink: #14171c;
+    --ink-muted: #4b5563;
+    --ink-faint: #7d8592;
+    --border: #dde1e7;
+    --accent: #3454d1;
+    --accent-ink: #1f3aa8;
+    --accent-soft: #eef1fc;
+    --code-bg: #1c1f26;
+    --code-ink: #e6e8ee;
+    --code-comment: #8892a6;
+    --express-bg: #fff6ea;
+    --express-border: #edc98c;
+    --express-ink: #6b4a12;
+    --next-bg: #eaf1ff;
+    --next-border: #b9cdfa;
+    --next-ink: #1f3aa8;
+    --warn-bg: #fdeeee;
+    --warn-border: #e8b4b4;
+    --warn-ink: #8a2b2b;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    margin: 0;
+  }
+
+  .shell {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 760px);
+    gap: 48px;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 48px 24px 120px;
+    align-items: start;
+  }
+
+  @media (max-width: 880px) {
+    .shell { grid-template-columns: minmax(0, 1fr); }
+    nav.toc { display: none; }
+  }
+
+  nav.toc {
+    position: sticky;
+    top: 32px;
+    font-size: 13.5px;
+    color: var(--ink-muted);
+  }
+
+  nav.toc .kicker {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 11px;
+    color: var(--ink-faint);
+    margin-bottom: 12px;
+    font-weight: 600;
+  }
+
+  nav.toc ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    counter-reset: toc;
+  }
+
+  nav.toc li {
+    counter-increment: toc;
+  }
+
+  nav.toc a {
+    display: block;
+    padding: 5px 0 5px 20px;
+    color: var(--ink-muted);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    position: relative;
+  }
+
+  nav.toc a::before {
+    content: counter(toc, decimal-leading-zero);
+    position: absolute;
+    left: 0;
+    font-variant-numeric: tabular-nums;
+    font-size: 11px;
+    color: var(--ink-faint);
+    top: 6px;
+  }
+
+  nav.toc a:hover {
+    color: var(--accent-ink);
+    border-left-color: var(--accent);
+  }
+
+  header.page-head {
+    margin-bottom: 8px;
+  }
+
+  header.page-head .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--ink-faint);
+    font-weight: 600;
+    margin-bottom: 14px;
+  }
+
+  header.page-head .eyebrow .divider {
+    color: var(--border);
+  }
+
+  header.page-head h1 {
+    font-size: 34px;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    margin: 0 0 14px;
+    text-wrap: balance;
+    font-weight: 750;
+  }
+
+  header.page-head p.dek {
+    color: var(--ink-muted);
+    font-size: 17px;
+    max-width: 62ch;
+    margin: 0 0 28px;
+  }
+
+  main { min-width: 0; }
+
+  section {
+    margin: 52px 0;
+    scroll-margin-top: 24px;
+  }
+
+  section > h2 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+    margin: 0 0 6px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    text-wrap: balance;
+  }
+
+  section > .section-sub {
+    color: var(--ink-faint);
+    font-size: 13px;
+    margin: 0 0 20px;
+    font-style: italic;
+  }
+
+  h3 {
+    font-size: 17.5px;
+    font-weight: 700;
+    margin: 28px 0 10px;
+  }
+
+  p { margin: 0 0 16px; }
+  p:last-child { margin-bottom: 0; }
+
+  a { color: var(--accent-ink); }
+
+  code.inline {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+    font-size: 0.87em;
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    padding: 0.1em 0.4em;
+    border-radius: 4px;
+  }
+
+  pre {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    border-radius: 10px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    margin: 0 0 16px;
+    font-size: 13.5px;
+    line-height: 1.6;
+  }
+
+  pre code {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+    white-space: pre;
+  }
+
+  .comment { color: var(--code-comment); }
+
+  .code-card {
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+
+  .code-card .label {
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 8px 14px;
+  }
+
+  .code-card.express .label {
+    background: var(--express-bg);
+    color: var(--express-ink);
+    border-bottom: 1px solid var(--express-border);
+  }
+
+  .code-card.next .label {
+    background: var(--next-bg);
+    color: var(--next-ink);
+    border-bottom: 1px solid var(--next-border);
+  }
+
+  .code-card pre { border-radius: 0; margin: 0; }
+
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+
+  @media (max-width: 620px) {
+    .compare { grid-template-columns: 1fr; }
+  }
+
+  .compare .code-card { margin-bottom: 0; }
+
+  .note {
+    border: 1px solid var(--next-border);
+    background: var(--next-bg);
+    color: var(--ink);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin: 0 0 16px;
+    font-size: 15.5px;
+  }
+
+  .note .note-label {
+    display: block;
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--next-ink);
+    margin-bottom: 6px;
+  }
+
+  .warn {
+    border: 1px solid var(--warn-border);
+    background: var(--warn-bg);
+    color: var(--ink);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin: 0 0 16px;
+    font-size: 15.5px;
+  }
+
+  .warn .warn-label {
+    display: block;
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--warn-ink);
+    margin-bottom: 6px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14.5px;
+    margin-bottom: 16px;
+  }
+
+  table caption { caption-side: top; }
+
+  th, td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  th {
+    color: var(--ink-faint);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+  }
+
+  td code.inline, th code.inline { white-space: nowrap; }
+
+  ul, ol.plain { padding-left: 22px; margin: 0 0 16px; }
+  ul li, ol.plain li { margin-bottom: 6px; }
+
+  .exercise {
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 16px 18px;
+    margin-bottom: 16px;
+  }
+
+  .exercise h4 {
+    margin: 0 0 8px;
+    font-size: 15.5px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .exercise h4 .tag {
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent-ink);
+    background: var(--accent-soft);
+    padding: 2px 7px;
+    border-radius: 5px;
+  }
+
+  .exercise.optional { border-left-color: var(--ink-faint); }
+
+  footer.colophon {
+    margin-top: 64px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    color: var(--ink-faint);
+    font-size: 13px;
+  }
+</style>
+
+<div class="shell">
+  <nav class="toc" aria-label="Table of contents">
+    <div class="kicker">On this page</div>
+    <ol>
+      <li><a href="#intro">Next.js &amp; TypeScript</a></li>
+      <li><a href="#simple-server">A route handler, not a web server</a></li>
+      <li><a href="#express">Where Express's job already went</a></li>
+      <li><a href="#web-and-express">Web and Route Handlers</a></li>
+      <li><a href="#change-tracking">Automatic change tracking</a></li>
+      <li><a href="#rest">REST</a></li>
+      <li><a href="#single-resource">Fetching a single resource</a></li>
+      <li><a href="#deleting">Deleting resources</a></li>
+      <li><a href="#postman">Postman &amp; REST clients</a></li>
+      <li><a href="#receiving-data">Receiving data</a></li>
+      <li><a href="#exercises-1">Exercises 3.1–3.6</a></li>
+      <li><a href="#request-types">HTTP request types</a></li>
+      <li><a href="#middleware">Where middleware went</a></li>
+      <li><a href="#exercises-2">Exercises 3.7–3.8</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <header class="page-head">
+      <div class="eyebrow"><span>Full Stack Open · Part 3</span><span class="divider">/</span><span>Next.js + TypeScript edition</span></div>
+      <h1>Next.js and Route Handlers</h1>
+      <p class="dek">The same ground the official material covers — Node, Express, REST, middleware — rebuilt on Next.js 16's App Router. Where the frameworks agree, the text barely changes. Where they don't, that's the part worth slowing down for.</p>
+    </header>
+
+    <section id="intro">
+      <h2>Next.js and TypeScript</h2>
+      <p class="section-sub">Was: “Node.js and Express”</p>
+      <p>In this part, our focus shifts towards the backend: implementing functionality on the server side of the stack. We'll build it on top of <strong>Next.js</strong>, a React framework that happens to include, as a first-class feature, a full server runtime — the same Node.js underneath, with routing, request handling, and JSON responses already wired in.</p>
+      <p>This means the relationship between "frontend framework" and "backend framework" collapses somewhat. In the original material, React (part 2) and Express (part 3) are two separate tools joined by fetch calls. Here, they're two capabilities of one framework: <code class="inline">page.tsx</code> files render UI, <code class="inline">route.ts</code> files answer HTTP requests, and both live in the same <code class="inline">app/</code> directory.</p>
+      <p>This project was scaffolded with <code class="inline">create-next-app</code> and already has TypeScript, ESLint, and a dev server configured — there's no separate <code class="inline">npm init</code> step, and no <code class="inline">index.js</code> entry point to hand-write.</p>
+      <div class="note">
+        <span class="note-label">Version note</span>
+        This material assumes Next.js 16.2.10 (the version installed in this project's <code class="inline">package.json</code>). Next.js has a history of renaming and reshaping App Router conventions between major versions — check <code class="inline">node_modules/next/dist/docs</code> against whatever version you're actually running before trusting any specific API shown here.
+      </div>
+      <p>Since this part isn't about the frontend, we won't be adding new pages built for humans to browse — just like the original material skips Vite for backend work, we'll mostly be adding files under <code class="inline">app/api/</code> rather than new pages.</p>
+    </section>
+
+    <section id="simple-server">
+      <h2>A route handler, not a web server</h2>
+      <p class="section-sub">Was: “Simple web server”</p>
+      <p>The original tutorial's first step is to hand-build a web server with Node's built-in <code class="inline">http</code> module:</p>
+      <div class="code-card express">
+        <div class="label">Express material · index.js</div>
+        <pre><code><span class="comment">const http = require('http')</span>
+
+const app = http.createServer((request, response) => {
+  response.writeHead(200, { 'Content-Type': 'text/plain' })
+  response.end('Hello World')
+})
+
+const PORT = 3001
+app.listen(PORT)
+console.log(`Server running on port ${PORT}`)</code></pre>
+      </div>
+      <p>Every one of those moving parts — <code class="inline">createServer</code>, <code class="inline">writeHead</code>, <code class="inline">response.end</code>, <code class="inline">app.listen(PORT)</code>, the startup <code class="inline">console.log</code> — is infrastructure that Next.js's dev server already owns. There is no file in this project that plays the role of "the server." The closest unit of work is a <strong>Route Handler</strong>: a file named <code class="inline">route.ts</code> that exports a function per HTTP method.</p>
+      <div class="code-card next">
+        <div class="label">Next.js · app/hello/route.ts</div>
+        <pre><code>export async function GET() {
+  return new Response('Hello World', {
+    headers: { 'Content-Type': 'text/plain' },
+  })
+}</code></pre>
+      </div>
+      <p>Run <code class="inline">npm run dev</code> and visit <code class="inline">http://localhost:3000/hello</code> — note the port. Next's dev server defaults to <strong>3000</strong>, not 3001, so wherever the original text says <code class="inline">:3001</code>, read it as <code class="inline">:3000</code> here. There's no <code class="inline">EADDRINUSE</code> ritual to learn either: if 3000 is taken, Next's CLI notices and offers the next free port itself.</p>
+      <p>One line from the original is worth flagging directly, because it's the one thing that <em>doesn't</em> survive the move:</p>
+      <div class="warn">
+        <span class="warn-label">Doesn't carry over</span>
+        “The server works the same way regardless of the latter part of the URL. Also the address <code class="inline">http://localhost:3001/foo/bar</code> will display the same content.” In Next.js, routing is filesystem-based — a <code class="inline">route.ts</code> answers <em>only</em> the exact path implied by its folder location. <code class="inline">app/hello/route.ts</code> handles <code class="inline">/hello</code>; a request to <code class="inline">/hello/foo/bar</code> 404s unless you deliberately add a catch-all segment for it.
+      </div>
+      <p>The original also spends a paragraph on CommonJS vs. ES modules (<code class="inline">require</code> vs. <code class="inline">import</code>). That entire discussion is moot here: this is a TypeScript/ESM project end to end, so it's <code class="inline">import</code>/<code class="inline">export</code> everywhere, no <code class="inline">require</code> in sight.</p>
+      <p>Turning this into the JSON-notes version needs no new concept — just swap the string body for a serialized array, same as before:</p>
+      <div class="code-card next">
+        <div class="label">Next.js · app/api/notes/route.ts</div>
+        <pre><code>interface Note {
+  id: string
+  content: string
+  important: boolean
+}
+
+const notes: Note[] = [
+  { id: "1", content: "HTML is easy", important: true },
+  { id: "2", content: "Browser can execute only JavaScript", important: false },
+  { id: "3", content: "GET and POST are the most important methods of HTTP protocol", important: true },
+]
+
+export async function GET() {
+  return Response.json(notes)
+}</code></pre>
+      </div>
+      <p><code class="inline">Response.json(notes)</code> is doing exactly what <code class="inline">JSON.stringify(notes)</code> plus a manual <code class="inline">Content-Type: application/json</code> header did in the raw-http version — just in one call, with the header set for you. Visiting <code class="inline">http://localhost:3000/api/notes</code> shows the same formatted JSON the original screenshot shows.</p>
+    </section>
+
+    <section id="express">
+      <h2>Where Express's job already went</h2>
+      <p class="section-sub">Was: “Express”</p>
+      <p>The original material's pitch for Express is that hand-rolling everything on raw <code class="inline">http</code> "is cumbersome, especially once the application grows in size" — so it reaches for a library that wraps the built-in module in a nicer interface: routing by path and verb, automatic JSON serialization, a request/response API that doesn't require manual header plumbing.</p>
+      <p>That entire pitch is the reason Route Handlers exist. There's no separate library to add here — <code class="inline">npm install express</code> has no equivalent step, because the convenience Express provides over raw <code class="inline">http</code> is exactly what Next.js's routing layer provides over raw <code class="inline">http</code>, just built into the framework you already installed. Nothing shows up in <code class="inline">package.json</code>'s <code class="inline">dependencies</code> for this — it's not a dependency, it's the framework itself.</p>
+      <p>The rest of that section — semantic versioning, the caret in <code class="inline">^5.1.0</code>, <code class="inline">npm update</code>, transitive dependencies in <code class="inline">node_modules</code> — is general npm knowledge, not Express-specific, and applies unchanged to a Next.js project's own dependencies (<code class="inline">next</code>, <code class="inline">react</code>, etc. in this project's <code class="inline">package.json</code>).</p>
+    </section>
+
+    <section id="web-and-express">
+      <h2>Web and Route Handlers</h2>
+      <p class="section-sub">Was: “Web and Express”</p>
+      <p>The original defines two routes in one file — a human-facing root and a JSON API path:</p>
+      <div class="code-card express">
+        <div class="label">Express material</div>
+        <pre><code>const express = require('express')
+const app = express()
+
+app.get('/', (request, response) => {
+  response.send('&lt;h1&gt;Hello World!&lt;/h1&gt;')
+})
+
+app.get('/api/notes', (request, response) => {
+  response.json(notes)
+})</code></pre>
+      </div>
+      <p>Express routes are registered <em>imperatively</em> — you call <code class="inline">app.get(path, handler)</code> for each one, in one file, in whatever order you write them. Next.js routes are <em>declared by file location</em> — there's no registry to call into; the path a handler answers to is the folder it lives in.</p>
+      <p>That difference matters most for the first route. <code class="inline">app.get('/', ...)</code> sends an HTML string — and the literal equivalent of "root path returns HTML" in this project isn't a Route Handler at all, it's <code class="inline">app/page.tsx</code>, which already occupies <code class="inline">/</code> and already returns markup (as JSX, which Next renders to HTML). A <code class="inline">route.ts</code> can't even coexist with a <code class="inline">page.tsx</code> at the same segment — so for a genuine "page" at <code class="inline">/</code>, <code class="inline">page.tsx</code> is the tool, not <code class="inline">route.ts</code>.</p>
+      <p>The second route needs nothing new — it's the <code class="inline">app/api/notes/route.ts</code> file from the previous section, doing precisely what <code class="inline">response.json(notes)</code> did: serialize <code class="inline">notes</code>, set <code class="inline">Content-Type: application/json</code>, default to status 200.</p>
+      <div class="compare">
+        <div class="code-card express">
+          <div class="label">Express</div>
+          <pre><code>app.get('/api/notes', (req, res) =&gt; {
+  res.json(notes)
+})</code></pre>
+        </div>
+        <div class="code-card next">
+          <div class="label">Next.js</div>
+          <pre><code>export async function GET() {
+  return Response.json(notes)
+}</code></pre>
+        </div>
+      </div>
+      <p>Same guarantee the original calls out — no manual <code class="inline">JSON.stringify</code> needed on either side, both frameworks do the string transformation for you and set the header to match.</p>
+    </section>
+
+    <section id="change-tracking">
+      <h2>Automatic change tracking</h2>
+      <p class="section-sub">Was: “Automatic Change Tracking”</p>
+      <p>The original spends this whole section getting from "restart the server by hand after every edit" to a workable <code class="inline">node --watch index.js</code>, then wires it into a custom <code class="inline">"dev"</code> npm script so <code class="inline">npm run dev</code> restarts the server on save.</p>
+      <div class="note">
+        <span class="note-label">Already done for you</span>
+        <code class="inline">create-next-app</code> already generated a <code class="inline">"dev": "next dev"</code> script in this project's <code class="inline">package.json</code>. There's no <code class="inline">--watch</code> flag to discover and no script to author — file-watching and process reloading are default behavior of <code class="inline">next dev</code>, on day one.
+      </div>
+      <p>One caveat from the original does still apply, almost word for word: editing a Route Handler doesn't get the same live-patching treatment React components get in the browser. Next's Fast Refresh story is about UI trees, not JSON responses — so after changing <code class="inline">route.ts</code> logic, you still refresh the browser (or re-send the request) to see the new output, even though the server process itself picked up the change automatically.</p>
+    </section>
+
+    <section id="rest">
+      <h2>REST</h2>
+      <p>This section barely changes at all — REST is a description of an HTTP contract, not a framework feature, so it applies identically regardless of what's implementing the server side. A note resource with id <code class="inline">10</code> still lives at a URL like <code class="inline">www.example.com/api/notes/10</code>; the collection is still <code class="inline">www.example.com/api/notes</code>; the verb-to-operation mapping is unchanged:</p>
+      <table>
+        <thead><tr><th>URL</th><th>Verb</th><th>Functionality</th></tr></thead>
+        <tbody>
+          <tr><td><code class="inline">notes/10</code></td><td>GET</td><td>fetches a single resource</td></tr>
+          <tr><td><code class="inline">notes</code></td><td>GET</td><td>fetches all resources in the collection</td></tr>
+          <tr><td><code class="inline">notes</code></td><td>POST</td><td>creates a new resource based on the request data</td></tr>
+          <tr><td><code class="inline">notes/10</code></td><td>DELETE</td><td>removes the identified resource</td></tr>
+          <tr><td><code class="inline">notes/10</code></td><td>PUT</td><td>replaces the entire identified resource with the request data</td></tr>
+          <tr><td><code class="inline">notes/10</code></td><td>PATCH</td><td>replaces a part of the identified resource with the request data</td></tr>
+        </tbody>
+      </table>
+      <p>Whether the code answering these requests is an Express route or a Next.js <code class="inline">route.ts</code> export is invisible from the client's side of the wire — a REST client, browser, or Postman can't tell the difference, and shouldn't need to.</p>
+    </section>
+
+    <section id="single-resource">
+      <h2>Fetching a single resource</h2>
+      <p>Express reads the id out of the URL with colon-syntax route params:</p>
+      <div class="code-card express">
+        <div class="label">Express</div>
+        <pre><code>app.get('/api/notes/:id', (request, response) =&gt; {
+  const id = request.params.id
+  const note = notes.find(note =&gt; note.id === id)
+  response.json(note)
+})</code></pre>
+      </div>
+      <p>Next.js's equivalent of a route param is a <strong>dynamic segment</strong> — a folder named in square brackets. The id shows up as a promise-wrapped param your handler must <code class="inline">await</code>, not a synchronous property:</p>
+      <div class="code-card next">
+        <div class="label">Next.js · app/api/notes/[id]/route.ts</div>
+        <pre><code>export async function GET(
+  request: Request,
+  { params }: { params: Promise&lt;{ id: string }&gt; }
+) {
+  const { id } = await params
+  const note = notes.find(note =&gt; note.id === id)
+  return Response.json(note)
+}</code></pre>
+      </div>
+      <div class="note">
+        <span class="note-label">Why a promise?</span>
+        This is a genuine Next.js-specific wrinkle, not a stylistic choice: <code class="inline">params</code> became a <code class="inline">Promise</code> as of Next 15, to support cases where route params aren't known until request time even for otherwise-static routes. Forgetting the <code class="inline">await</code> is a common mistake — TypeScript will catch it for you here, since <code class="inline">params.id</code> on a <code class="inline">Promise</code> is a type error.
+      </div>
+      <p>The same problem the original walks into next — an id that doesn't match anything resolves to <code class="inline">undefined</code>, and blindly returning it produces a <code class="inline">200</code> with an empty body, which is the wrong status for "not found" — applies exactly the same way here, and the fix is the same shape:</p>
+      <div class="compare">
+        <div class="code-card express">
+          <div class="label">Express</div>
+          <pre><code>if (note) {
+  response.json(note)
+} else {
+  response.status(404).end()
+}</code></pre>
+        </div>
+        <div class="code-card next">
+          <div class="label">Next.js</div>
+          <pre><code>if (note) {
+  return Response.json(note)
+}
+return new Response(null, { status: 404 })</code></pre>
+        </div>
+      </div>
+      <p>Same reasoning as the original: all objects are truthy, <code class="inline">undefined</code> is falsy, and a REST API doesn't need to render anything human-readable for a 404 — the status code alone is the interface.</p>
+    </section>
+
+    <section id="deleting">
+      <h2>Deleting resources</h2>
+      <p>Same shape as the GET-by-id case, different exported function name and verb:</p>
+      <div class="compare">
+        <div class="code-card express">
+          <div class="label">Express</div>
+          <pre><code>app.delete('/api/notes/:id', (request, response) =&gt; {
+  const id = request.params.id
+  notes = notes.filter(note =&gt; note.id !== id)
+  response.status(204).end()
+})</code></pre>
+        </div>
+        <div class="code-card next">
+          <div class="label">Next.js</div>
+          <pre><code>export async function DELETE(
+  request: Request,
+  { params }: { params: Promise&lt;{ id: string }&gt; }
+) {
+  const { id } = await params
+  notes = notes.filter(note =&gt; note.id !== id)
+  return new Response(null, { status: 204 })
+}</code></pre>
+        </div>
+      </div>
+      <p>Both files live at the same path — <code class="inline">app/api/notes/[id]/route.ts</code> exports both <code class="inline">GET</code> and <code class="inline">DELETE</code> side by side, the same way one Express file has both an <code class="inline">app.get('/api/notes/:id', ...)</code> and an <code class="inline">app.delete('/api/notes/:id', ...)</code>. The same unresolved question from the original applies unchanged too: no consensus on 204 vs. 404 when the id never existed in the first place — 204 both times is the pragmatic default.</p>
+      <div class="note">
+        <span class="note-label">One TypeScript wrinkle</span>
+        <code class="inline">let notes = [...]</code> needs to be a mutable <code class="inline">let</code>, not <code class="inline">const</code>, for reassignment via <code class="inline">.filter()</code> to work — same as the original Express example, this is plain JavaScript/TypeScript behavior, nothing Next-specific about it.
+      </div>
+    </section>
+
+    <section id="postman">
+      <h2>Postman &amp; REST clients</h2>
+      <p>Nothing here is framework-specific, and none of it changes: Postman, the VS Code REST Client, and the WebStorm HTTP Client all talk raw HTTP, so they work identically against a Next.js Route Handler as they do against an Express route. The only adjustment is the port in every URL — <code class="inline">http://localhost:3000/api/notes/2</code>, not <code class="inline">:3001</code>, since that's what <code class="inline">next dev</code> listens on by default.</p>
+      <p>A <code class="inline">.rest</code> file for this project looks exactly like the original:</p>
+      <pre><code>GET http://localhost:3000/api/notes/
+
+###
+POST http://localhost:3000/api/notes/ HTTP/1.1
+content-type: application/json
+
+{
+    "content": "sample",
+    "important": false
+}</code></pre>
+    </section>
+
+    <section id="receiving-data">
+      <h2>Receiving data</h2>
+      <p>Here's a place Next.js is strictly simpler than Express, not just relabeled. The original needs a dedicated step to make <code class="inline">request.body</code> exist at all:</p>
+      <div class="code-card express">
+        <div class="label">Express</div>
+        <pre><code>const express = require('express')
+const app = express()
+
+app.use(express.json())
+
+app.post('/api/notes', (request, response) =&gt; {
+  const note = request.body
+  console.log(note)
+  response.json(note)
+})</code></pre>
+      </div>
+      <p>Without <code class="inline">express.json()</code> registered as middleware, <code class="inline">request.body</code> is <code class="inline">undefined</code> — the json-parser middleware is what reads the raw request stream, parses it, and attaches the result to <code class="inline">request.body</code> before your handler runs.</p>
+      <p>Next.js's <code class="inline">Request</code> object is the Web-standard <code class="inline">Request</code> — body parsing is just a method call on it, no separate parser to install or register:</p>
+      <div class="code-card next">
+        <div class="label">Next.js</div>
+        <pre><code>export async function POST(request: Request) {
+  const note = await request.json()
+  console.log(note)
+  return Response.json(note)
+}</code></pre>
+      </div>
+      <p>There's no <code class="inline">app.use(express.json())</code> line anywhere — no middleware to register before routes, no ordering to get right relative to a logger. <code class="inline">await request.json()</code> reads and parses the body on demand, right where you need it. The failure mode the original warns about — a client sending the wrong <code class="inline">Content-Type</code> (e.g. <code class="inline">text/plain</code>) and the server silently receiving an empty object — still exists here in a similar shape: <code class="inline">request.json()</code> will throw on a body that isn't valid JSON, so a request with the wrong content type or a malformed payload surfaces as a thrown error you'll want to catch, rather than a silently empty object.</p>
+      <p>The id-generation and validation logic translates over almost line for line, with one difference forced by TypeScript: the body from <code class="inline">request.json()</code> is typed <code class="inline">any</code>, so reading its shape safely means either casting it or checking it defensively before trusting it:</p>
+      <div class="code-card next">
+        <div class="label">Next.js · app/api/notes/route.ts</div>
+        <pre><code>const generateId = (): string =&gt; {
+  const maxId = notes.length &gt; 0
+    ? Math.max(...notes.map(n =&gt; Number(n.id)))
+    : 0
+  return String(maxId + 1)
+}
+
+export async function POST(request: Request) {
+  const body = await request.json()
+
+  if (!body.content) {
+    return Response.json({ error: 'content missing' }, { status: 400 })
+  }
+
+  const note: Note = {
+    content: body.content,
+    important: body.important || false,
+    id: generateId(),
+  }
+
+  notes = notes.concat(note)
+
+  return Response.json(note)
+}</code></pre>
+      </div>
+      <p>The reasoning is identical to the original at every step: returning early on the 400 branch matters for the same reason — skip it, and a note with no <code class="inline">content</code> gets saved before the function reaches its end; <code class="inline">body.important || false</code> defaults a missing/falsy <code class="inline">important</code> to <code class="inline">false</code> the same way in both languages, since the <code class="inline">||</code> operator behaves identically in TypeScript and JavaScript.</p>
+    </section>
+
+    <section id="exercises-1">
+      <h2>Exercises 3.1–3.6</h2>
+      <p class="section-sub">Phonebook backend, rewritten for Next.js Route Handlers</p>
+      <p>Same phonebook, same data, same behavior — every exercise below asks for a <code class="inline">route.ts</code> file (or a dynamic-segment variant of one) instead of an Express route.</p>
+
+      <div class="exercise">
+        <h4><span class="tag">3.1</span>Phonebook backend step 1</h4>
+        <p>Create <code class="inline">app/api/persons/route.ts</code> exporting a <code class="inline">GET</code> that returns this hardcoded array:</p>
+        <pre><code>[
+  { "id": "1", "name": "Arto Hellas", "number": "040-123456" },
+  { "id": "2", "name": "Ada Lovelace", "number": "39-44-5323523" },
+  { "id": "3", "name": "Dan Abramov", "number": "12-43-234345" },
+  { "id": "4", "name": "Mary Poppendieck", "number": "39-23-6423122" }
+]</code></pre>
+        <p>Visiting <code class="inline">http://localhost:3000/api/persons</code> should show the array as JSON. Unlike the original exercise, there's no separate <code class="inline">npm start</code> vs. <code class="inline">npm run dev</code> distinction to build — <code class="inline">create-next-app</code> already gave you both scripts, and <code class="inline">npm run dev</code> already restarts on save. Nothing to add here.</p>
+      </div>
+
+      <div class="exercise">
+        <h4><span class="tag">3.2</span>Phonebook backend step 2</h4>
+        <p>Add <code class="inline">app/api/info/route.ts</code> returning the entry count and the current server time, e.g. as an HTML fragment:</p>
+        <pre><code>export async function GET() {
+  const count = persons.length
+  const now = new Date()
+  return new Response(
+    `&lt;p&gt;Phonebook has info for ${count} people&lt;/p&gt;&lt;p&gt;${now}&lt;/p&gt;`,
+    { headers: { 'Content-Type': 'text/html' } }
+  )
+}</code></pre>
+        <p>Note the path: the original puts this at <code class="inline">/info</code>, outside <code class="inline">/api</code>. You can mirror that exactly with <code class="inline">app/info/route.ts</code> — just double check it doesn't collide with a <code class="inline">page.tsx</code> at the same segment, since (as covered earlier) the two can't coexist at one path.</p>
+      </div>
+
+      <div class="exercise">
+        <h4><span class="tag">3.3</span>Phonebook backend step 3</h4>
+        <p>Create <code class="inline">app/api/persons/[id]/route.ts</code> exporting <code class="inline">GET</code>, using a dynamic segment for the id (remember: <code class="inline">params</code> is a <code class="inline">Promise</code>, so <code class="inline">await</code> it). Return the appropriate status code — not a silent empty <code class="inline">200</code> — when no entry matches the id.</p>
+      </div>
+
+      <div class="exercise">
+        <h4><span class="tag">3.4</span>Phonebook backend step 4</h4>
+        <p>In the same <code class="inline">app/api/persons/[id]/route.ts</code> file, add a <code class="inline">DELETE</code> export alongside <code class="inline">GET</code>. Test it with Postman or the REST Client, same as the original — just remember the port is 3000.</p>
+      </div>
+
+      <div class="exercise">
+        <h4><span class="tag">3.5</span>Phonebook backend step 5</h4>
+        <p>Add a <code class="inline">POST</code> export to <code class="inline">app/api/persons/route.ts</code> that reads the body with <code class="inline">await request.json()</code> and generates a new id with <code class="inline">Math.random</code>, exactly as the original specifies — use a wide enough range that collisions stay unlikely.</p>
+      </div>
+
+      <div class="exercise">
+        <h4><span class="tag">3.6</span>Phonebook backend step 6</h4>
+        <p>Reject the <code class="inline">POST</code> (with an informative body, not just a bare status) when:</p>
+        <ul>
+          <li>the <code class="inline">name</code> or <code class="inline">number</code> is missing</li>
+          <li>the <code class="inline">name</code> already exists in the phonebook</li>
+        </ul>
+        <pre><code>return Response.json({ error: 'name must be unique' }, { status: 400 })</code></pre>
+        <p>Same validation shape as the notes example above — check, return early with a 400, and only fall through to the mutation once the input has been validated.</p>
+      </div>
+    </section>
+
+    <section id="request-types">
+      <h2>HTTP request types</h2>
+      <p>This section is entirely about the HTTP standard itself — safety and idempotency are properties of the protocol, not of whatever framework happens to be implementing a given endpoint, so nothing here changes when the implementation is a Next.js Route Handler instead of an Express route.</p>
+      <p><code class="inline">GET</code> and <code class="inline">HEAD</code> are still expected to be <strong>safe</strong> — no side effects, nothing but retrieval. <code class="inline">GET</code>, <code class="inline">HEAD</code>, <code class="inline">PUT</code>, and <code class="inline">DELETE</code> are still expected to be <strong>idempotent</strong> — N identical requests should leave the server in the same state one would. <code class="inline">POST</code> is still the one verb that's neither: five POSTs with the same body to <code class="inline">app/api/notes/route.ts</code>'s <code class="inline">POST</code> handler produce five distinct notes, same as five POSTs to an Express route would.</p>
+      <p>None of these guarantees come from the framework in either case — they come from writing handlers that respect the convention, whether that handler is registered with <code class="inline">app.get(...)</code> or exported as <code class="inline">GET</code> from a <code class="inline">route.ts</code> file.</p>
+    </section>
+
+    <section id="middleware">
+      <h2>Where middleware went</h2>
+      <p class="section-sub">Was: “Middleware” — the biggest structural difference in this whole part</p>
+      <p>This is the one section where the two frameworks genuinely part ways, so it's worth being precise about what's actually gone versus what's just relocated.</p>
+      <p>Express's middleware model is a <strong>chain</strong>: every registered function receives <code class="inline">(request, response, next)</code>, and calling <code class="inline">next()</code> passes control to whatever's registered after it. A request logger looks like this:</p>
+      <div class="code-card express">
+        <div class="label">Express</div>
+        <pre><code>const requestLogger = (request, response, next) =&gt; {
+  console.log('Method:', request.method)
+  console.log('Path:  ', request.path)
+  console.log('Body:  ', request.body)
+  console.log('---')
+  next()
+}
+
+app.use(requestLogger)</code></pre>
+      </div>
+      <p>Route Handlers don't have a <code class="inline">next()</code>-chaining mechanism at all — there's no per-route middleware pipeline to register logging or parsing into. That leaves two real options, and they solve different problems:</p>
+      <h3>Option A — log inline, in the handler itself</h3>
+      <p>For a handful of routes, the simplest port of the original's intent is a small helper function you call explicitly at the top of each handler:</p>
+      <pre><code>function logRequest(request: Request) {
+  console.log('Method:', request.method)
+  console.log('Path:  ', new URL(request.url).pathname)
+}
+
+export async function GET(request: Request) {
+  logRequest(request)
+  return Response.json(notes)
+}</code></pre>
+      <p>This is more repetitive than Express's one-line <code class="inline">app.use(requestLogger)</code> — you're opting every handler in individually rather than registering once — but it stays local to each route and needs no new file-convention knowledge.</p>
+      <h3>Option B — proxy.ts, for logic that spans every route</h3>
+      <div class="note">
+        <span class="note-label">Naming, precisely</span>
+        In Next.js 15 and earlier this file was called <code class="inline">middleware.ts</code>. As of <strong>Next.js 16</strong> — the version this project runs — it was renamed to <strong>proxy.ts</strong> "to better reflect its purpose"; the functionality is unchanged. If you're reading older Next.js material or Stack Overflow answers, mentally substitute <code class="inline">proxy.ts</code> for <code class="inline">middleware.ts</code>.
+      </div>
+      <p>A <code class="inline">proxy.ts</code> at the project root runs before a request reaches any route, and can inspect or modify it. It's the closest thing to Express's "runs before all routes" middleware — but it's a single file per project (you compose logic into it via imports, not via a growing <code class="inline">app.use()</code> stack), and it's tuned for redirects, rewrites, and header manipulation rather than general-purpose request logging:</p>
+      <pre><code>// proxy.ts
+import type { NextRequest } from 'next/server'
+
+export function proxy(request: NextRequest) {
+  console.log('Method:', request.method)
+  console.log('Path:  ', request.nextUrl.pathname)
+}
+
+export const config = {
+  matcher: '/api/:path*',
+}</code></pre>
+      <p>The <code class="inline">matcher</code> config is doing the job the original's middleware ordering did implicitly — scoping which paths this runs for, rather than relying on the order functions were registered in.</p>
+      <h3>The 404 case needs nothing at all</h3>
+      <p>The original's last piece of middleware catches requests to routes that don't exist:</p>
+      <div class="code-card express">
+        <div class="label">Express</div>
+        <pre><code>const unknownEndpoint = (request, response) =&gt; {
+  response.status(404).send({ error: 'unknown endpoint' })
+}
+
+app.use(unknownEndpoint)</code></pre>
+      </div>
+      <div class="note">
+        <span class="note-label">Already the default</span>
+        Next.js returns a 404 automatically for any request that doesn't match a <code class="inline">route.ts</code>, <code class="inline">page.tsx</code>, or other file convention — there's no catch-all middleware to write. If you want a custom JSON body on that 404 rather than Next's default page, the tool is a <code class="inline">not-found.tsx</code> file (for page routes) — there isn't a direct equivalent for shaping the body of an unmatched API route's 404 the way <code class="inline">unknownEndpoint</code> does, since there's no handler being invoked at all in that case.
+      </div>
+    </section>
+
+    <section id="exercises-2">
+      <h2>Exercises 3.7–3.8</h2>
+      <p class="section-sub">Logging, without morgan</p>
+      <div class="exercise">
+        <h4><span class="tag">3.7</span>Phonebook backend step 7</h4>
+        <p>The original installs <code class="inline">morgan</code> and wires it in with <code class="inline">app.use(morgan('tiny'))</code>. Morgan is an Express-middleware library specifically — it hooks into the <code class="inline">(req, res, next)</code> chain, which Route Handlers don't have, so there's no drop-in equivalent package to install here.</p>
+        <p>Port the intent, not the library: write a small logging helper and call it at the top of each handler you want logged (Option A above), mirroring <code class="inline">tiny</code>'s format — method, path, status, response time:</p>
+        <pre><code>function logTiny(method: string, path: string, status: number, startedAt: number) {
+  const ms = Date.now() - startedAt
+  console.log(`${method} ${path} ${status} - ${ms}ms`)
+}</code></pre>
+      </div>
+      <div class="exercise optional">
+        <h4><span class="tag">3.8*</span>Phonebook backend step 8</h4>
+        <p>The original's optional challenge is configuring morgan to also log the POST body — here, that's just extending the same helper to accept and print the parsed body from <code class="inline">await request.json()</code>, same privacy caveat as the original: think twice before logging real request bodies anywhere persistent, since names and phone numbers are exactly the kind of data GDPR and similar laws care about.</p>
+      </div>
+    </section>
+
+    <footer class="colophon">
+      Adapted from the Full Stack Open Part 3 material (Node.js and Express) for Next.js 16 / TypeScript. Framework specifics verified against <code class="inline">node_modules/next/dist/docs</code> in this project rather than assumed from memory.
+    </footer>
+  </main>
+</div>
+</body>
+</html>
