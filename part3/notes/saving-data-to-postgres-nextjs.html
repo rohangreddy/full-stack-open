@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Saving Data to Postgres — FSO Part 3c</title>
+</head>
+<body>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --ink: #14171c;
+    --ink-muted: #4b5563;
+    --ink-faint: #7d8592;
+    --border: #dde1e7;
+    --accent: #3454d1;
+    --accent-ink: #1f3aa8;
+    --accent-soft: #eef1fc;
+    --code-bg: #1c1f26;
+    --code-ink: #e6e8ee;
+    --code-comment: #8892a6;
+    --express-bg: #fff6ea;
+    --express-border: #edc98c;
+    --express-ink: #6b4a12;
+    --next-bg: #eaf1ff;
+    --next-border: #b9cdfa;
+    --next-ink: #1f3aa8;
+    --warn-bg: #fdeeee;
+    --warn-border: #e8b4b4;
+    --warn-ink: #8a2b2b;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115;
+      --surface: #171a20;
+      --ink: #e7e9ee;
+      --ink-muted: #9aa3b2;
+      --ink-faint: #6b7280;
+      --border: #2a2e37;
+      --accent: #7fa0ff;
+      --accent-ink: #b7c8ff;
+      --accent-soft: #1a2236;
+      --code-bg: #0b0d11;
+      --code-ink: #d7dbe3;
+      --code-comment: #6b7385;
+      --express-bg: #241d12;
+      --express-border: #5a4322;
+      --express-ink: #e3bf7f;
+      --next-bg: #16233a;
+      --next-border: #33507a;
+      --next-ink: #b7c8ff;
+      --warn-bg: #2a1717;
+      --warn-border: #6b2f2f;
+      --warn-ink: #f0b4b4;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #0f1115;
+    --surface: #171a20;
+    --ink: #e7e9ee;
+    --ink-muted: #9aa3b2;
+    --ink-faint: #6b7280;
+    --border: #2a2e37;
+    --accent: #7fa0ff;
+    --accent-ink: #b7c8ff;
+    --accent-soft: #1a2236;
+    --code-bg: #0b0d11;
+    --code-ink: #d7dbe3;
+    --code-comment: #6b7385;
+    --express-bg: #241d12;
+    --express-border: #5a4322;
+    --express-ink: #e3bf7f;
+    --next-bg: #16233a;
+    --next-border: #33507a;
+    --next-ink: #b7c8ff;
+    --warn-bg: #2a1717;
+    --warn-border: #6b2f2f;
+    --warn-ink: #f0b4b4;
+  }
+
+  :root[data-theme="light"] {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --ink: #14171c;
+    --ink-muted: #4b5563;
+    --ink-faint: #7d8592;
+    --border: #dde1e7;
+    --accent: #3454d1;
+    --accent-ink: #1f3aa8;
+    --accent-soft: #eef1fc;
+    --code-bg: #1c1f26;
+    --code-ink: #e6e8ee;
+    --code-comment: #8892a6;
+    --express-bg: #fff6ea;
+    --express-border: #edc98c;
+    --express-ink: #6b4a12;
+    --next-bg: #eaf1ff;
+    --next-border: #b9cdfa;
+    --next-ink: #1f3aa8;
+    --warn-bg: #fdeeee;
+    --warn-border: #e8b4b4;
+    --warn-ink: #8a2b2b;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    margin: 0;
+  }
+
+  .shell {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 760px);
+    gap: 48px;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 48px 24px 120px;
+    align-items: start;
+  }
+
+  @media (max-width: 880px) {
+    .shell { grid-template-columns: minmax(0, 1fr); }
+    nav.toc { display: none; }
+  }
+
+  nav.toc {
+    position: sticky;
+    top: 32px;
+    font-size: 13.5px;
+    color: var(--ink-muted);
+  }
+
+  nav.toc .kicker {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 11px;
+    color: var(--ink-faint);
+    margin-bottom: 12px;
+    font-weight: 600;
+  }
+
+  nav.toc ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    counter-reset: toc;
+  }
+
+  nav.toc li {
+    counter-increment: toc;
+  }
+
+  nav.toc a {
+    display: block;
+    padding: 5px 0 5px 20px;
+    color: var(--ink-muted);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    position: relative;
+  }
+
+  nav.toc a::before {
+    content: counter(toc, decimal-leading-zero);
+    position: absolute;
+    left: 0;
+    font-variant-numeric: tabular-nums;
+    font-size: 11px;
+    color: var(--ink-faint);
+    top: 6px;
+  }
+
+  nav.toc a:hover {
+    color: var(--accent-ink);
+    border-left-color: var(--accent);
+  }
+
+  header.page-head {
+    margin-bottom: 8px;
+  }
+
+  header.page-head .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--ink-faint);
+    font-weight: 600;
+    margin-bottom: 14px;
+  }
+
+  header.page-head .eyebrow .divider {
+    color: var(--border);
+  }
+
+  header.page-head h1 {
+    font-size: 34px;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    margin: 0 0 14px;
+    text-wrap: balance;
+    font-weight: 750;
+  }
+
+  header.page-head p.dek {
+    color: var(--ink-muted);
+    font-size: 17px;
+    max-width: 62ch;
+    margin: 0 0 28px;
+  }
+
+  main { min-width: 0; }
+
+  section {
+    margin: 52px 0;
+    scroll-margin-top: 24px;
+  }
+
+  section > h2 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+    margin: 0 0 6px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    text-wrap: balance;
+  }
+
+  section > .section-sub {
+    color: var(--ink-faint);
+    font-size: 13px;
+    margin: 0 0 20px;
+    font-style: italic;
+  }
+
+  h3 {
+    font-size: 17.5px;
+    font-weight: 700;
+    margin: 28px 0 10px;
+  }
+
+  p { margin: 0 0 16px; }
+  p:last-child { margin-bottom: 0; }
+
+  a { color: var(--accent-ink); }
+
+  code.inline {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+    font-size: 0.87em;
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    padding: 0.1em 0.4em;
+    border-radius: 4px;
+  }
+
+  pre {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    border-radius: 10px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    margin: 0 0 16px;
+    font-size: 13.5px;
+    line-height: 1.6;
+  }
+
+  pre code {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+    white-space: pre;
+  }
+
+  .comment { color: var(--code-comment); }
+
+  .code-card {
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+
+  .code-card .label {
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 8px 14px;
+  }
+
+  .code-card.express .label {
+    background: var(--express-bg);
+    color: var(--express-ink);
+    border-bottom: 1px solid var(--express-border);
+  }
+
+  .code-card.next .label {
+    background: var(--next-bg);
+    color: var(--next-ink);
+    border-bottom: 1px solid var(--next-border);
+  }
+
+  .code-card pre { border-radius: 0; margin: 0; }
+
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+
+  @media (max-width: 620px) {
+    .compare { grid-template-columns: 1fr; }
+  }
+
+  .compare .code-card { margin-bottom: 0; }
+
+  .note {
+    border: 1px solid var(--next-border);
+    background: var(--next-bg);
+    color: var(--ink);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin: 0 0 16px;
+    font-size: 15.5px;
+  }
+
+  .note .note-label {
+    display: block;
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--next-ink);
+    margin-bottom: 6px;
+  }
+
+  .warn {
+    border: 1px solid var(--warn-border);
+    background: var(--warn-bg);
+    color: var(--ink);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin: 0 0 16px;
+    font-size: 15.5px;
+  }
+
+  .warn .warn-label {
+    display: block;
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--warn-ink);
+    margin-bottom: 6px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14.5px;
+    margin-bottom: 16px;
+  }
+
+  table caption { caption-side: top; }
+
+  th, td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  th {
+    color: var(--ink-faint);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+  }
+
+  td code.inline, th code.inline { white-space: nowrap; }
+
+  ul, ol.plain { padding-left: 22px; margin: 0 0 16px; }
+  ul li, ol.plain li { margin-bottom: 6px; }
+
+  .exercise {
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 16px 18px;
+    margin-bottom: 16px;
+  }
+
+  .exercise h4 {
+    margin: 0 0 8px;
+    font-size: 15.5px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .exercise h4 .tag {
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent-ink);
+    background: var(--accent-soft);
+    padding: 2px 7px;
+    border-radius: 5px;
+  }
+
+  .exercise.optional { border-left-color: var(--ink-faint); }
+
+  footer.colophon {
+    margin-top: 64px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    color: var(--ink-faint);
+    font-size: 13px;
+  }
+</style>
+
+<div class="shell">
+  <nav class="toc" aria-label="Table of contents">
+    <div class="kicker">On this page</div>
+    <ol>
+      <li><a href="#debugging">Debugging Next.js applications</a></li>
+      <li><a href="#question-everything">Question everything</a></li>
+      <li><a href="#postgres">Postgres, not MongoDB</a></li>
+      <li><a href="#neon">Creating a cloud Postgres database</a></li>
+      <li><a href="#prisma">Prisma: schema and client</a></li>
+      <li><a href="#exercise-312">Exercise 3.12</a></li>
+      <li><a href="#connecting-backend">Connecting the backend to a database</a></li>
+      <li><a href="#db-module">The Prisma client as its own module</a></li>
+      <li><a href="#env-vars">Environment variables, the Next.js way</a></li>
+      <li><a href="#route-handlers-db">Using the database in route handlers</a></li>
+      <li><a href="#exercises-1314">Exercises 3.13–3.14</a></li>
+      <li><a href="#error-handling">Error handling</a></li>
+      <li><a href="#other-operations">Other operations</a></li>
+      <li><a href="#exercises-1518">Exercises 3.15–3.18</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <header class="page-head">
+      <div class="eyebrow"><span>Full Stack Open · Part 3c</span><span class="divider">/</span><span>Next.js + Postgres edition</span></div>
+      <h1>Saving Data to Postgres</h1>
+      <p class="dek">The original material reaches for MongoDB and Mongoose. This version covers the same ground — a real, persistent, cloud-hosted database wired into the backend — using a relational database (Postgres) and the ORM that's become the default pairing with Next.js: Prisma.</p>
+    </header>
+
+    <section id="debugging">
+      <h2>Debugging Next.js applications</h2>
+      <p class="section-sub">Was: “Debugging Node applications”</p>
+      <p>Debugging a Next.js Route Handler is slightly more involved than debugging a client component, but the fundamentals are unchanged from the original material: printing to the console is a tried and true method, and it's always worth doing first. Route Handler code runs on the server, so its <code class="inline">console.log</code> output shows up in the terminal running <code class="inline">next dev</code>, not the browser console — that trips people up the first time.</p>
+      <h3>Visual Studio Code</h3>
+      <p>The VS Code debugger works the same way it does for any Node process — you just point it at the <code class="inline">next dev</code> script instead of a hand-written <code class="inline">index.js</code>. A minimal <code class="inline">.vscode/launch.json</code> entry looks like this:</p>
+      <pre><code>{
+  "type": "node",
+  "request": "launch",
+  "name": "Next.js: debug server-side",
+  "runtimeExecutable": "npm",
+  "runtimeArgs": ["run", "dev"],
+  "skipFiles": ["&lt;node_internals&gt;/**"]
+}</code></pre>
+      <p>Set a breakpoint inside a <code class="inline">route.ts</code> handler, launch that configuration, and trigger the route from the browser or a REST client — execution pauses exactly like it would in the original Express example, with the same variable inspector and step controls.</p>
+      <div class="note">
+        <span class="note-label">Client vs. server code</span>
+        Next.js blurs frontend and backend into one project, so it matters which side you're debugging. A breakpoint in <code class="inline">app/page.tsx</code> is client code — use the browser's own dev tools for that, same as any React app. A breakpoint in <code class="inline">app/api/persons/route.ts</code> is server code — that's what the VS Code launch config above, or <code class="inline">node --inspect</code>-style debugging, is for.
+      </div>
+      <h3>Chrome dev tools</h3>
+      <p>Next.js's dev server exposes the same <code class="inline">--inspect</code> hook the original material uses. Start it with:</p>
+      <pre><code>NODE_OPTIONS='--inspect' npm run dev</code></pre>
+      <p>Then open <code class="inline">chrome://inspect</code> in Chrome (rather than clicking a green Node icon from a separate dev-tools panel, which was specific to how the original example launched its server) and connect to the remote target. From there, the debugging view works exactly as described in the original: the Sources tab sets breakpoints in server code, the Console tab shows every <code class="inline">console.log</code> the server produces for requests you trigger, and you can inspect and evaluate expressions live.</p>
+      <p>All of a route handler's log lines land in this same server console — including anything logged from the database layer we're about to add — so this is also where Prisma's own query logging will show up, if you enable it.</p>
+    </section>
+
+    <section id="question-everything">
+      <h2>Question everything</h2>
+      <p>This advice is unchanged by the choice of framework or database, and is arguably more relevant here than ever: once a database is in the mix, there are now three layers where a bug can hide — the React tree, the Route Handler, and the database itself — and it's very common for the actual problem to be one layer away from where it first appears to be.</p>
+      <p>The discipline is the same as the original material describes: be systematic, question everything, and eliminate possibilities one at a time using logging, a REST client, the debugger, and experience. When something breaks, the worst response is to keep writing new code on top of the broken state — stop, and either fix the root cause or delete back to a point where things worked, exactly as the Toyota "stop and fix" (Jidoka) principle the original text cites.</p>
+    </section>
+
+    <section id="postgres">
+      <h2>Postgres, not MongoDB</h2>
+      <p class="section-sub">Was: “MongoDB”</p>
+      <p>The official material reaches for MongoDB — a document database — specifically because it's <em>lower complexity</em> than a relational database for a first pass at persistence, deferring relational databases and SQL to part 13 of the course.</p>
+      <p>This version makes the opposite trade deliberately: Postgres, a relational database, paired with <strong>Prisma</strong>, an ORM that has become the default choice in the Next.js ecosystem specifically because it integrates cleanly with TypeScript and the App Router's server-only code. Where the original spends time explaining what a "document" and a "collection" are, the equivalent concepts here are the familiar relational ones — a <strong>table</strong> made of <strong>rows</strong>, each with a fixed set of typed <strong>columns</strong> — which likely need less introduction if you've touched SQL before.</p>
+      <div class="note">
+        <span class="note-label">Why Prisma specifically</span>
+        You could talk to Postgres directly with a lower-level client library (e.g. <code class="inline">pg</code> or <code class="inline">postgres.js</code>), the same way the original material could've used the plain MongoDB Node.js driver directly. Prisma occupies the same niche Mongoose does in the original text: a higher-level layer that turns database rows into typed objects, and gives you migrations and a schema file as the source of truth for your data's shape.
+      </div>
+      <p>One structural difference is worth flagging up front, because it shapes several sections below: Mongo is <em>schemaless</em> at the database level — Mongoose is what imposes structure, at the application layer. Postgres is not schemaless — the database itself enforces column types and constraints, and Prisma's schema file is used to both describe that structure <em>and</em> generate the actual SQL that creates it (via <strong>migrations</strong>). There's no equivalent step in the Mongoose workflow, where the schema is purely an application-level convention the database itself doesn't know about.</p>
+    </section>
+
+    <section id="neon">
+      <h2>Creating a cloud Postgres database</h2>
+      <p class="section-sub">Was: “MongoDB Atlas” setup</p>
+      <p>Just as the original material points you at MongoDB Atlas for a free, cloud-hosted cluster, you'll want a cloud-hosted Postgres instance rather than installing Postgres locally. <a href="https://neon.com">Neon</a> is a common pick for Next.js projects — free tier, serverless-friendly, and it hands you a connection string in the same spirit as Atlas's. (Supabase and Vercel Postgres are equally reasonable alternatives; the workflow below is generic to any of them.)</p>
+      <p>The steps mirror the Atlas flow closely:</p>
+      <ol class="plain">
+        <li>Create an account and a new project. A default database and a default Postgres <em>role</em> (Neon's term for a database user) are usually created for you automatically — this is the rough equivalent of the "create a cluster" step for Atlas.</li>
+        <li>Unlike Atlas, there's typically no separate "network access / IP allowlist" step to configure for a serverless Postgres provider — connections are authenticated by the credentials in the connection string itself, not by source IP. Still, double-check your provider's dashboard for any access restriction it applies by default.</li>
+        <li>Copy the connection string from the dashboard's "Connect" panel. It has the same job as the Atlas URI, just a different shape:</li>
+      </ol>
+      <pre><code>postgresql://fullstack:thepasswordishere@ep-example-12345.eu-central-1.aws.neon.tech/neondb?sslmode=require</code></pre>
+      <div class="warn">
+        <span class="warn-label">Same warning as the original</span>
+        This connection string embeds a password in plain text — treat it exactly as the original material treats the MongoDB URI: never commit it, never paste it into a public issue or chat. We'll keep it out of version control the same way, just via a different (and simpler) mechanism than the original's <code class="inline">dotenv</code> setup — see <a href="#env-vars">Environment variables, the Next.js way</a> below.
+      </div>
+      <p>We are now ready to use the database.</p>
+    </section>
+
+    <section id="prisma">
+      <h2>Prisma: schema and client</h2>
+      <p class="section-sub">Was: “Mongoose”</p>
+      <p>Install Prisma in the phonebook project:</p>
+      <pre><code>npm install prisma --save-dev
+npm install @prisma/client
+npx prisma init</code></pre>
+      <p><code class="inline">npx prisma init</code> is the step with no real Mongoose equivalent — the original material's <code class="inline">mongoose.Schema</code> is just a JavaScript object literal you write by hand anywhere in your code. Prisma instead scaffolds a dedicated <code class="inline">prisma/schema.prisma</code> file (Prisma's own schema language, not TypeScript) and a <code class="inline">.env</code> file with a <code class="inline">DATABASE_URL</code> placeholder already wired in.</p>
+      <p>Paste the Neon connection string from the previous section into that generated <code class="inline">.env</code> as <code class="inline">DATABASE_URL</code>, then define the schema for a phonebook entry:</p>
+      <div class="code-card next">
+        <div class="label">prisma/schema.prisma</div>
+        <pre><code>generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Person {
+  id     Int    @id @default(autoincrement())
+  name   String
+  number String
+}</code></pre>
+      </div>
+      <p>This plays the same role <code class="inline">noteSchema</code> plays in the original — it's the single source of truth for what a stored record looks like — but with one addition the document-database version doesn't need: <code class="inline">datasource db</code>, which is where <code class="inline">DATABASE_URL</code> is actually consumed. In the original, the connection URL is passed directly to <code class="inline">mongoose.connect(url)</code> in application code; here, it's read once, by Prisma's tooling, from the schema file.</p>
+      <p>Unlike Mongoose — where defining a schema is purely an in-application convention the database itself never sees — this schema is turned into real SQL and applied to the database with a <strong>migration</strong>:</p>
+      <pre><code>npx prisma migrate dev --name init</code></pre>
+      <p>This is a genuinely new step with no equivalent in the original material: it creates the <code class="inline">Person</code> table in Postgres (Mongo, being schemaless, never needed a table/collection created up front — MongoDB Atlas creates a collection automatically the first time a document is written to it) and generates a fully-typed Prisma Client tailored to this exact schema.</p>
+      <div class="note">
+        <span class="note-label">Naming convention, inverted</span>
+        The original notes that Mongoose pluralizes a singular model name into the collection name (<code class="inline">Note</code> model → <code class="inline">notes</code> collection, <code class="inline">Person</code> model → <code class="inline">people</code> collection). Prisma Client does something similar in spirit but keeps the casing convention instead of pluralizing awkwardly: a <code class="inline">model Person</code> is queried through <code class="inline">prisma.person</code> (camelCased, not pluralized to <code class="inline">people</code>) — worth checking directly against the generated client rather than assuming either convention.
+      </div>
+    </section>
+
+    <section id="exercise-312">
+      <h2>Exercise 3.12</h2>
+      <div class="exercise">
+        <h4><span class="tag">3.12</span>Command-line database</h4>
+        <p>Create a cloud-based Postgres database for the phonebook application (Neon, Supabase, or any provider that gives you a <code class="inline">DATABASE_URL</code>-style connection string).</p>
+        <p>Create a <code class="inline">prisma/schema.prisma</code> with a <code class="inline">Person</code> model as shown above, and run <code class="inline">npx prisma migrate dev --name init</code> to create the table.</p>
+        <p>Write a small script — <code class="inline">scripts/db-cli.ts</code>, run with <code class="inline">npx tsx scripts/db-cli.ts</code> — that can be used for adding entries to the phonebook and listing all existing entries, mirroring the original exercise's <code class="inline">mongo.js</code> in spirit:</p>
+        <pre><code>import { PrismaClient } from '../generated/prisma'
+
+const prisma = new PrismaClient()
+
+const [name, number] = process.argv.slice(2)
+
+async function main() {
+  if (name && number) {
+    const person = await prisma.person.create({ data: { name, number } })
+    console.log(`added ${person.name} number ${person.number} to phonebook`)
+  } else {
+    const people = await prisma.person.findMany()
+    console.log('phonebook:')
+    people.forEach(p =&gt; console.log(`${p.name} ${p.number}`))
+  }
+}
+
+main().finally(() =&gt; prisma.$disconnect())</code></pre>
+        <p>Usage mirrors the original exercise, minus the password argument — the connection string already lives in <code class="inline">.env</code>, so there's nothing sensitive to pass on the command line at all:</p>
+        <pre><code>npx tsx scripts/db-cli.ts "Arto Vihavainen" 045-1232456
+npx tsx scripts/db-cli.ts</code></pre>
+        <div class="warn">
+          <span class="warn-label">Still true here</span>
+          The original's warning not to commit the password still applies — just to a different file. <code class="inline">npx prisma init</code> already added <code class="inline">prisma/.env</code>-style files to <code class="inline">.gitignore</code> for you (Next.js's own <code class="inline">.env*</code> gitignore rule covers the project-root <code class="inline">.env</code> too) — double check before your first commit rather than assuming.
+        </div>
+      </div>
+    </section>
+
+    <section id="connecting-backend">
+      <h2>Connecting the backend to a database</h2>
+      <p>With the schema migrated, we have enough to start using Postgres in the phonebook's route handlers. The direct, quick-and-dirty version — mirroring the original's first pass of pasting Mongoose setup straight into <code class="inline">index.js</code> — would be creating a <code class="inline">PrismaClient</code> right inside a route file:</p>
+      <div class="code-card next">
+        <div class="label">app/api/persons/route.ts (quick pass, not final)</div>
+        <pre><code>import { PrismaClient } from '../../../generated/prisma'
+
+const prisma = new PrismaClient()
+
+export async function GET() {
+  const people = await prisma.person.findMany()
+  return Response.json(people)
+}</code></pre>
+      </div>
+      <p>This already fixes something the original material calls out about Mongoose's default output: Mongo documents carry a <code class="inline">_id</code> object and a <code class="inline">__v</code> version key that need a <code class="inline">toJSON</code> transform to clean up before sending them to the frontend. A Prisma <code class="inline">Person</code> row has exactly the fields defined in the schema — <code class="inline">id</code>, <code class="inline">name</code>, <code class="inline">number</code> — serialized as-is by <code class="inline">Response.json</code>, no transform step needed. The one adjustment on the frontend side: <code class="inline">id</code> here is a Postgres <code class="inline">Int</code>, not a Mongo ObjectId string, so anywhere the frontend was treating ids as opaque strings still works, but anywhere it was relying on Mongo's specific 24-character hex format will need to change.</p>
+      <p>The problem with the snippet above is the one the next section exists to fix — exactly as the original material moves its inline Mongoose setup into <code class="inline">models/note.js</code>.</p>
+    </section>
+
+    <section id="db-module">
+      <h2>The Prisma client as its own module</h2>
+      <p class="section-sub">Was: “Moving db configuration to its own module”</p>
+      <p>The original extracts Mongoose setup into <code class="inline">models/note.js</code> mainly for organization — nothing about Express forces a single shared connection object. With Prisma in a framework that hot-reloads server code on every save, this step stops being optional: instantiating <code class="inline">new PrismaClient()</code> inside a route file (as above) creates a fresh client, and a fresh pool of database connections, on every Fast-Refresh reload in development — which reliably exhausts your database's connection limit. This is a documented Next.js + Prisma pitfall, not a stylistic preference.</p>
+      <p>The fix is a small singleton module, conventionally placed at <code class="inline">lib/prisma.ts</code> (matching this project's existing <code class="inline">lib/persons.ts</code> convention):</p>
+      <div class="code-card next">
+        <div class="label">lib/prisma.ts</div>
+        <pre><code>import { PrismaClient } from '../generated/prisma'
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined
+}
+
+export const prisma = globalForPrisma.prisma ?? new PrismaClient()
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.prisma = prisma
+}</code></pre>
+      </div>
+      <p>The intent maps directly onto the original's module: define the connection once, export the ready-to-use client, and let every route handler <code class="inline">import</code> the same instance rather than each managing its own. The mechanism differs because the failure mode differs — Mongoose's <code class="inline">models/note.js</code> is a plain module-caching trick (Node only evaluates a module once per process); Prisma's version stashes the client on <code class="inline">globalThis</code> specifically to survive Next.js's dev-time module reloading, which a plain module-level <code class="inline">const</code> would not.</p>
+      <p>Importing it elsewhere reads exactly like the original's <code class="inline">const Note = require('./models/note')</code>:</p>
+      <pre><code>import { prisma } from '../../../lib/prisma'</code></pre>
+    </section>
+
+    <section id="env-vars">
+      <h2>Environment variables, the Next.js way</h2>
+      <p class="section-sub">Was: “Defining environment variables using the dotenv library”</p>
+      <p>The original material installs a separate library, <code class="inline">dotenv</code>, and adds an explicit <code class="inline">require('dotenv').config()</code> call — with a specific warning that it must run before any module that reads <code class="inline">process.env</code> is imported, since import order determines whether the variables exist yet.</p>
+      <div class="note">
+        <span class="note-label">Already the default — nothing to install</span>
+        Next.js loads <code class="inline">.env</code>, <code class="inline">.env.local</code>, and friends automatically, with no library and no explicit <code class="inline">config()</code> call, for any file under <code class="inline">app/</code> (Route Handlers included) as well as for the Prisma CLI itself. There is no import-order hazard to manage — the values are already in <code class="inline">process.env</code> before your code runs, full stop.
+      </div>
+      <p><code class="inline">npx prisma init</code> already created a root <code class="inline">.env</code> with <code class="inline">DATABASE_URL</code> in it, which is both what Prisma's CLI reads for migrations and what your route handlers read at request time via <code class="inline">process.env.DATABASE_URL</code> — one file, one variable, used by both. This project's <code class="inline">.gitignore</code> (generated by <code class="inline">create-next-app</code>) already excludes <code class="inline">.env*</code>, so — unlike the original material, where gitignoring <code class="inline">.env</code> is a step you have to remember to do yourself — there's nothing extra to configure here.</p>
+      <p>The original's <code class="inline">PORT</code> environment variable has no equivalent worth adding: <code class="inline">next dev</code> and <code class="inline">next start</code> both default to port 3000 and take a <code class="inline">-p</code> flag directly if you need to change it, so there's no <code class="inline">app.listen(PORT)</code> call in this codebase for an env var to feed into.</p>
+      <p>The original's platform-specific notes about Fly.io's <code class="inline">.dockerignore</code> and Render's dashboard env panel carry over conceptually to whatever you deploy this to — Vercel, Render, Fly.io, etc. all have a "set an environment variable in the dashboard" step for production secrets like <code class="inline">DATABASE_URL</code>, since a <code class="inline">.env</code> file that's gitignored locally obviously isn't available on a server that only receives what you push or deploy.</p>
+    </section>
+
+    <section id="route-handlers-db">
+      <h2>Using the database in route handlers</h2>
+      <p>With the shared client in place, the GET handler becomes:</p>
+      <div class="code-card next">
+        <div class="label">app/api/persons/route.ts</div>
+        <pre><code>import { prisma } from '../../../lib/prisma'
+
+export async function GET() {
+  const people = await prisma.person.findMany()
+  return Response.json(people)
+}</code></pre>
+      </div>
+      <p>Where the original awaits a <code class="inline">.then()</code> callback off <code class="inline">Note.find({})</code>, Prisma Client methods are promise-based the same way — <code class="inline">async</code>/<code class="inline">await</code> reads slightly more directly here only because Route Handlers are already <code class="inline">async</code> functions by convention, not because of anything Prisma-specific.</p>
+      <p>Creating a new entry:</p>
+      <div class="code-card next">
+        <div class="label">app/api/persons/route.ts</div>
+        <pre><code>export async function POST(request: Request) {
+  const body = await request.json()
+
+  if (!body.name || !body.number) {
+    return Response.json({ error: 'name or number missing' }, { status: 400 })
+  }
+
+  const person = await prisma.person.create({
+    data: { name: body.name, number: body.number },
+  })
+
+  return Response.json(person)
+}</code></pre>
+      </div>
+      <p>Same shape as the original's <code class="inline">note.save().then(savedNote =&gt; response.json(savedNote))</code>: validate first and return early on failure, then persist, then respond with exactly what got saved (including the database-assigned <code class="inline">id</code>) rather than echoing back the raw request body.</p>
+      <p>Fetching a single record by id, the Prisma equivalent of <code class="inline">Note.findById</code>, is <code class="inline">findUnique</code> — and because the schema's <code class="inline">id</code> is an <code class="inline">Int</code>, the string route param needs an explicit conversion Mongoose never required (Mongo ObjectIds are handled as opaque strings throughout):</p>
+      <div class="code-card next">
+        <div class="label">app/api/persons/[id]/route.ts</div>
+        <pre><code>import { prisma } from '../../../../lib/prisma'
+
+export async function GET(
+  request: Request,
+  { params }: { params: Promise&lt;{ id: string }&gt; }
+) {
+  const { id } = await params
+  const person = await prisma.person.findUnique({
+    where: { id: Number(id) },
+  })
+
+  if (person) {
+    return Response.json(person)
+  }
+  return new Response(null, { status: 404 })
+}</code></pre>
+      </div>
+      <p>Same 404-on-<code class="inline">null</code> branching the original establishes for <code class="inline">findById</code> — a nonexistent id resolves to <code class="inline">null</code> here too, not an error, so the check is a plain truthiness test either way.</p>
+    </section>
+
+    <section id="exercises-1314">
+      <h2>Exercises 3.13–3.14</h2>
+      <div class="exercise">
+        <h4><span class="tag">3.13</span>Phonebook database, step 1</h4>
+        <p>Change <code class="inline">app/api/persons/route.ts</code>'s <code class="inline">GET</code> so the data comes from <code class="inline">prisma.person.findMany()</code> instead of the hardcoded <code class="inline">lib/persons.ts</code> array. Verify the frontend still works after the change.</p>
+      </div>
+      <div class="exercise">
+        <h4><span class="tag">3.14</span>Phonebook database, step 2</h4>
+        <p>Change the <code class="inline">POST</code> handler so new numbers are saved via <code class="inline">prisma.person.create()</code>. As in the original exercise, you can ignore duplicate-name handling for now — that's exercise 3.17's job. Keep the Prisma-specific code (the client import, the queries) inside the route handlers or the shared <code class="inline">lib/prisma.ts</code> module, not scattered into components, matching how the original asks you to keep all Mongoose-specific code inside its own module.</p>
+      </div>
+    </section>
+
+    <section id="error-handling">
+      <h2>Error handling</h2>
+      <p>Requesting a note with a nonexistent-but-otherwise-valid id resolves to <code class="inline">null</code> in the original — handled with a plain <code class="inline">if (note)</code> check, already covered above for the Prisma equivalent. The more interesting case is the original's second scenario: an id that isn't even the right <em>shape</em> for the database's id type, e.g. <code class="inline">/api/notes/someInvalidId</code> against Mongo's ObjectId format, which makes Mongoose's <code class="inline">findById</code> throw a <code class="inline">CastError</code> that has to be caught explicitly.</p>
+      <p>The same class of problem exists here: our schema's <code class="inline">id</code> is an <code class="inline">Int</code>, so a request to <code class="inline">/api/persons/someInvalidId</code> needs to be handled before it ever reaches Prisma, since <code class="inline">Number('someInvalidId')</code> is <code class="inline">NaN</code>, not a thrown error — a plain wrong-format id fails silently rather than loudly, which is arguably worse than Mongoose's approach if left unchecked:</p>
+      <div class="code-card next">
+        <div class="label">app/api/persons/[id]/route.ts</div>
+        <pre><code>export async function GET(
+  request: Request,
+  { params }: { params: Promise&lt;{ id: string }&gt; }
+) {
+  const { id } = await params
+  const numericId = Number(id)
+
+  if (!Number.isInteger(numericId)) {
+    return Response.json({ error: 'malformatted id' }, { status: 400 })
+  }
+
+  const person = await prisma.person.findUnique({ where: { id: numericId } })
+
+  if (person) {
+    return Response.json(person)
+  }
+  return new Response(null, { status: 404 })
+}</code></pre>
+      </div>
+      <p>Prisma does still throw its own runtime errors — a unique-constraint violation on <code class="inline">create()</code>, for instance, throws a <code class="inline">PrismaClientKnownRequestError</code> tagged with a <code class="inline">code</code> like <code class="inline">P2002</code> (unique constraint failed) or <code class="inline">P2025</code> (record not found on an update/delete). Those are worth catching explicitly the same way the original catches a rejected Mongoose promise:</p>
+      <pre><code>import { Prisma } from '../../../../generated/prisma'
+
+try {
+  const person = await prisma.person.update({
+    where: { id: numericId },
+    data: { number: body.number },
+  })
+  return Response.json(person)
+} catch (error) {
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &amp;&amp;
+    error.code === 'P2025'
+  ) {
+    return new Response(null, { status: 404 })
+  }
+  throw error
+}</code></pre>
+      <div class="warn">
+        <span class="warn-label">No middleware chain to centralize this in</span>
+        The original moves this logic into a single Express <code class="inline">errorHandler</code> middleware, registered once with <code class="inline">app.use(errorHandler)</code> at the end of the chain, so every route benefits without repeating the <code class="inline">catch</code> block. Route Handlers have no equivalent "runs after every route" mechanism (see the <code class="inline">proxy.ts</code> discussion in the previous chapter of these notes) — the practical option is a small shared helper function you call from each handler's <code class="inline">catch</code> block, trading Express's one-line centralization for a few extra explicit calls.
+      </div>
+    </section>
+
+    <section id="other-operations">
+      <h2>Other operations</h2>
+      <p>Deleting an entry, the Prisma equivalent of <code class="inline">findByIdAndDelete</code>:</p>
+      <div class="code-card next">
+        <div class="label">app/api/persons/[id]/route.ts</div>
+        <pre><code>export async function DELETE(
+  request: Request,
+  { params }: { params: Promise&lt;{ id: string }&gt; }
+) {
+  const { id } = await params
+
+  try {
+    await prisma.person.delete({ where: { id: Number(id) } })
+    return new Response(null, { status: 204 })
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &amp;&amp;
+      error.code === 'P2025'
+    ) {
+      return new Response(null, { status: 204 })
+    }
+    throw error
+  }
+}</code></pre>
+      </div>
+      <p>Note the deliberate choice to still return <code class="inline">204</code> when the row was already gone: Prisma's <code class="inline">delete()</code>, unlike Mongoose's <code class="inline">findByIdAndDelete</code>, <em>throws</em> (<code class="inline">P2025</code>) rather than silently succeeding when nothing matched the id — so without the <code class="inline">catch</code> here, "delete something that's already deleted" would surface as a <code class="inline">500</code> instead of the idempotent <code class="inline">204</code> the original settles on for both cases.</p>
+      <p>Updating an entry — the original walks through <code class="inline">findById</code> then mutate-then-<code class="inline">save()</code> specifically to preserve Mongoose's validation, favoring that over the shortcut <code class="inline">findByIdAndUpdate</code>. Prisma's <code class="inline">update()</code> doesn't have that same validation trade-off (schema-level constraints are enforced by Postgres itself either way), so the direct one-call version is the idiomatic choice here, not a shortcut to be wary of:</p>
+      <div class="code-card next">
+        <div class="label">app/api/persons/[id]/route.ts</div>
+        <pre><code>export async function PUT(
+  request: Request,
+  { params }: { params: Promise&lt;{ id: string }&gt; }
+) {
+  const { id } = await params
+  const body = await request.json()
+
+  try {
+    const person = await prisma.person.update({
+      where: { id: Number(id) },
+      data: { name: body.name, number: body.number },
+    })
+    return Response.json(person)
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &amp;&amp;
+      error.code === 'P2025'
+    ) {
+      return new Response(null, { status: 404 })
+    }
+    throw error
+  }
+}</code></pre>
+      </div>
+      <p>No nested-promise concern here either — the original flags its update handler's nested <code class="inline">.then()</code> inside <code class="inline">.then()</code> as something async/await (introduced later in the course) will eventually clean up. Since this project is already using <code class="inline">async</code>/<code class="inline">await</code> throughout, that awkwardness never shows up in the first place.</p>
+    </section>
+
+    <section id="exercises-1518">
+      <h2>Exercises 3.15–3.18</h2>
+      <div class="exercise">
+        <h4><span class="tag">3.15</span>Phonebook database, step 3</h4>
+        <p>Change the <code class="inline">DELETE</code> handler in <code class="inline">app/api/persons/[id]/route.ts</code> so deletions are reflected in the database via <code class="inline">prisma.person.delete()</code>. Verify the frontend still works.</p>
+      </div>
+      <div class="exercise">
+        <h4><span class="tag">3.16</span>Phonebook database, step 4</h4>
+        <p>Extract the error-handling shown above (the <code class="inline">P2025</code>/<code class="inline">P2002</code> checks, the malformatted-id check) into a small shared helper — e.g. <code class="inline">lib/handleDbError.ts</code> — and call it from each route handler's <code class="inline">catch</code> block. This is the closest equivalent to the original's "move error handling into middleware" exercise, given Route Handlers have no middleware chain to centralize it in directly.</p>
+      </div>
+      <div class="exercise optional">
+        <h4><span class="tag">3.17*</span>Phonebook database, step 5</h4>
+        <p>When the frontend tries to add a person whose name is already in the phonebook, it sends a <code class="inline">PUT</code> to that person's URL to update their number instead. Support that in the <code class="inline">PUT</code> handler shown above (it already does), and additionally add a <code class="inline">@unique</code> constraint on the <code class="inline">name</code> field in <code class="inline">schema.prisma</code> — a genuinely relational-database way to enforce the invariant at the data layer rather than only in application code:</p>
+        <pre><code>model Person {
+  id     Int    @id @default(autoincrement())
+  name   String @unique
+  number String
+}</code></pre>
+        <p>Run <code class="inline">npx prisma migrate dev</code> again after changing the schema. With the constraint in place, a duplicate <code class="inline">create()</code> throws <code class="inline">P2002</code>, which your <code class="inline">POST</code> handler should catch and turn into a <code class="inline">400</code> with a body like <code class="inline">{ error: 'name must be unique' }</code> — mirroring the original exercise's application-level uniqueness check, but backed by an actual database constraint instead of a manual <code class="inline">.find()</code> scan.</p>
+      </div>
+      <div class="exercise optional">
+        <h4><span class="tag">3.18*</span>Phonebook database, step 6</h4>
+        <p>Update <code class="inline">app/api/persons/[id]/route.ts</code>'s <code class="inline">GET</code> and <code class="inline">app/api/info/route.ts</code> to read from the database — <code class="inline">info</code> becomes a <code class="inline">prisma.person.count()</code> call instead of <code class="inline">persons.length</code>. Verify both directly with the browser, Postman, or the VS Code REST client, same as the original.</p>
+      </div>
+    </section>
+
+    <footer class="colophon">
+      Adapted from the Full Stack Open Part 3c material (Node.js, Express, and MongoDB/Mongoose) for Next.js 16 / TypeScript / Postgres / Prisma. Framework specifics verified against <code class="inline">node_modules/next/dist/docs</code> in this project rather than assumed from memory.
+    </footer>
+  </main>
+</div>
+</body>
+</html>

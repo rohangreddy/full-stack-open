@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Converting the Notes Frontend to Next.js — FSO Part 3</title>
+</head>
+<body>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --ink: #14171c;
+    --ink-muted: #4b5563;
+    --ink-faint: #7d8592;
+    --border: #dde1e7;
+    --accent: #3454d1;
+    --accent-ink: #1f3aa8;
+    --accent-soft: #eef1fc;
+    --code-bg: #1c1f26;
+    --code-ink: #e6e8ee;
+    --code-comment: #8892a6;
+    --express-bg: #fff6ea;
+    --express-border: #edc98c;
+    --express-ink: #6b4a12;
+    --next-bg: #eaf1ff;
+    --next-border: #b9cdfa;
+    --next-ink: #1f3aa8;
+    --warn-bg: #fdeeee;
+    --warn-border: #e8b4b4;
+    --warn-ink: #8a2b2b;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115;
+      --surface: #171a20;
+      --ink: #e7e9ee;
+      --ink-muted: #9aa3b2;
+      --ink-faint: #6b7280;
+      --border: #2a2e37;
+      --accent: #7fa0ff;
+      --accent-ink: #b7c8ff;
+      --accent-soft: #1a2236;
+      --code-bg: #0b0d11;
+      --code-ink: #d7dbe3;
+      --code-comment: #6b7385;
+      --express-bg: #241d12;
+      --express-border: #5a4322;
+      --express-ink: #e3bf7f;
+      --next-bg: #16233a;
+      --next-border: #33507a;
+      --next-ink: #b7c8ff;
+      --warn-bg: #2a1717;
+      --warn-border: #6b2f2f;
+      --warn-ink: #f0b4b4;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #0f1115;
+    --surface: #171a20;
+    --ink: #e7e9ee;
+    --ink-muted: #9aa3b2;
+    --ink-faint: #6b7280;
+    --border: #2a2e37;
+    --accent: #7fa0ff;
+    --accent-ink: #b7c8ff;
+    --accent-soft: #1a2236;
+    --code-bg: #0b0d11;
+    --code-ink: #d7dbe3;
+    --code-comment: #6b7385;
+    --express-bg: #241d12;
+    --express-border: #5a4322;
+    --express-ink: #e3bf7f;
+    --next-bg: #16233a;
+    --next-border: #33507a;
+    --next-ink: #b7c8ff;
+    --warn-bg: #2a1717;
+    --warn-border: #6b2f2f;
+    --warn-ink: #f0b4b4;
+  }
+
+  :root[data-theme="light"] {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --ink: #14171c;
+    --ink-muted: #4b5563;
+    --ink-faint: #7d8592;
+    --border: #dde1e7;
+    --accent: #3454d1;
+    --accent-ink: #1f3aa8;
+    --accent-soft: #eef1fc;
+    --code-bg: #1c1f26;
+    --code-ink: #e6e8ee;
+    --code-comment: #8892a6;
+    --express-bg: #fff6ea;
+    --express-border: #edc98c;
+    --express-ink: #6b4a12;
+    --next-bg: #eaf1ff;
+    --next-border: #b9cdfa;
+    --next-ink: #1f3aa8;
+    --warn-bg: #fdeeee;
+    --warn-border: #e8b4b4;
+    --warn-ink: #8a2b2b;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    margin: 0;
+  }
+
+  .shell {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 760px);
+    gap: 48px;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 48px 24px 120px;
+    align-items: start;
+  }
+
+  @media (max-width: 880px) {
+    .shell { grid-template-columns: minmax(0, 1fr); }
+    nav.toc { display: none; }
+  }
+
+  nav.toc {
+    position: sticky;
+    top: 32px;
+    font-size: 13.5px;
+    color: var(--ink-muted);
+  }
+
+  nav.toc .kicker {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 11px;
+    color: var(--ink-faint);
+    margin-bottom: 12px;
+    font-weight: 600;
+  }
+
+  nav.toc ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    counter-reset: toc;
+  }
+
+  nav.toc li {
+    counter-increment: toc;
+  }
+
+  nav.toc a {
+    display: block;
+    padding: 5px 0 5px 20px;
+    color: var(--ink-muted);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    position: relative;
+  }
+
+  nav.toc a::before {
+    content: counter(toc, decimal-leading-zero);
+    position: absolute;
+    left: 0;
+    font-variant-numeric: tabular-nums;
+    font-size: 11px;
+    color: var(--ink-faint);
+    top: 6px;
+  }
+
+  nav.toc a:hover {
+    color: var(--accent-ink);
+    border-left-color: var(--accent);
+  }
+
+  header.page-head {
+    margin-bottom: 8px;
+  }
+
+  header.page-head .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--ink-faint);
+    font-weight: 600;
+    margin-bottom: 14px;
+  }
+
+  header.page-head .eyebrow .divider {
+    color: var(--border);
+  }
+
+  header.page-head h1 {
+    font-size: 34px;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    margin: 0 0 14px;
+    text-wrap: balance;
+    font-weight: 750;
+  }
+
+  header.page-head p.dek {
+    color: var(--ink-muted);
+    font-size: 17px;
+    max-width: 62ch;
+    margin: 0 0 28px;
+  }
+
+  main { min-width: 0; }
+
+  section {
+    margin: 52px 0;
+    scroll-margin-top: 24px;
+  }
+
+  section > h2 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+    margin: 0 0 6px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    text-wrap: balance;
+  }
+
+  section > .section-sub {
+    color: var(--ink-faint);
+    font-size: 13px;
+    margin: 0 0 20px;
+    font-style: italic;
+  }
+
+  h3 {
+    font-size: 17.5px;
+    font-weight: 700;
+    margin: 28px 0 10px;
+  }
+
+  p { margin: 0 0 16px; }
+  p:last-child { margin-bottom: 0; }
+
+  a { color: var(--accent-ink); }
+
+  code.inline {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+    font-size: 0.87em;
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    padding: 0.1em 0.4em;
+    border-radius: 4px;
+  }
+
+  pre {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    border-radius: 10px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    margin: 0 0 16px;
+    font-size: 13.5px;
+    line-height: 1.6;
+  }
+
+  pre code {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+    white-space: pre;
+  }
+
+  .comment { color: var(--code-comment); }
+
+  .code-card {
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+
+  .code-card .label {
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 8px 14px;
+  }
+
+  .code-card.express .label {
+    background: var(--express-bg);
+    color: var(--express-ink);
+    border-bottom: 1px solid var(--express-border);
+  }
+
+  .code-card.next .label {
+    background: var(--next-bg);
+    color: var(--next-ink);
+    border-bottom: 1px solid var(--next-border);
+  }
+
+  .code-card pre { border-radius: 0; margin: 0; }
+
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+
+  @media (max-width: 620px) {
+    .compare { grid-template-columns: 1fr; }
+  }
+
+  .compare .code-card { margin-bottom: 0; }
+
+  .note {
+    border: 1px solid var(--next-border);
+    background: var(--next-bg);
+    color: var(--ink);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin: 0 0 16px;
+    font-size: 15.5px;
+  }
+
+  .note .note-label {
+    display: block;
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--next-ink);
+    margin-bottom: 6px;
+  }
+
+  .warn {
+    border: 1px solid var(--warn-border);
+    background: var(--warn-bg);
+    color: var(--ink);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin: 0 0 16px;
+    font-size: 15.5px;
+  }
+
+  .warn .warn-label {
+    display: block;
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--warn-ink);
+    margin-bottom: 6px;
+  }
+
+  .fix {
+    border: 1px solid var(--border);
+    border-left: 3px solid #2f9e5f;
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 0 0 16px;
+    font-size: 15.5px;
+  }
+
+  .fix .fix-label {
+    display: block;
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #2f9e5f;
+    margin-bottom: 6px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14.5px;
+    margin-bottom: 16px;
+  }
+
+  table caption { caption-side: top; }
+
+  th, td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  th {
+    color: var(--ink-faint);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+  }
+
+  td code.inline, th code.inline { white-space: nowrap; }
+
+  ul, ol.plain { padding-left: 22px; margin: 0 0 16px; }
+  ul li, ol.plain li { margin-bottom: 6px; }
+
+  .exercise {
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 16px 18px;
+    margin-bottom: 16px;
+  }
+
+  .exercise h4 {
+    margin: 0 0 8px;
+    font-size: 15.5px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .exercise h4 .tag {
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent-ink);
+    background: var(--accent-soft);
+    padding: 2px 7px;
+    border-radius: 5px;
+  }
+
+  .exercise.optional { border-left-color: var(--ink-faint); }
+
+  .step-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    margin-right: 8px;
+    flex-shrink: 0;
+  }
+
+  h3.step {
+    display: flex;
+    align-items: center;
+  }
+
+  footer.colophon {
+    margin-top: 64px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    color: var(--ink-faint);
+    font-size: 13px;
+  }
+</style>
+
+<div class="shell">
+  <nav class="toc" aria-label="Table of contents">
+    <div class="kicker">On this page</div>
+    <ol>
+      <li><a href="#intro">Starting point</a></li>
+      <li><a href="#audit">What's worth fixing along the way</a></li>
+      <li><a href="#layout">Where the files land</a></li>
+      <li><a href="#step-types">Step 1 — Give the domain a type</a></li>
+      <li><a href="#step-server">Step 2 — Fetch the initial notes on the server</a></li>
+      <li><a href="#step-client">Step 3 — Draw the server/client boundary</a></li>
+      <li><a href="#step-fetch">Step 4 — Retire axios and the hardcoded URL</a></li>
+      <li><a href="#step-cleanup">Step 5 — Fix the input bug and clean up</a></li>
+      <li><a href="#step-split">Step 6 — Split out the Note component</a></li>
+      <li><a href="#full-listing">Step 7 — The full picture</a></li>
+      <li><a href="#exercise">Exercise</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <header class="page-head">
+      <div class="eyebrow"><span>Full Stack Open · Part 3</span><span class="divider">/</span><span>Converting the part 2 notes frontend</span></div>
+      <h1>Converting the Notes Frontend to Next.js</h1>
+      <p class="dek">A step-by-step port of <code class="inline">part2/src</code> (Vite + React + axios) into the Next.js/TypeScript project from earlier in this part. Along the way we clean up a few things the original code got away with only because it was a learning exercise, not because they were good practice.</p>
+    </header>
+
+    <section id="intro">
+      <h2>Starting point</h2>
+      <p>The code we're converting is the notes frontend built up over part 2: four files, no TypeScript, axios for HTTP, and a component tree that fetches its own data in a <code class="inline">useEffect</code> after the first render.</p>
+      <div class="code-card express">
+        <div class="label">part2/src/services/notes.js</div>
+        <pre><code>import axios from 'axios'
+const baseUrl = 'http://localhost:3001/notes'
+
+const getAll = () =&gt; {
+  const request = axios.get(baseUrl)
+  return request.then(response =&gt; response.data)
+}
+
+const create = newObject =&gt; {
+  const request = axios.post(baseUrl, newObject)
+  return request.then(response =&gt; response.data)
+}
+
+const update = (id, newObject) =&gt; {
+  const request = axios.patch(`${baseUrl}/${id}`, newObject)
+  return request.then(response =&gt; response.data)
+}
+
+export default { getAll, create, update }</code></pre>
+      </div>
+      <div class="code-card express">
+        <div class="label">part2/src/components/Note.jsx</div>
+        <pre><code>const Note = ({ note, toggleImportance }) =&gt; {
+  const label = note.important
+    ? 'make not important' : 'make important'
+
+  return (
+    &lt;li&gt;
+      {note.content}
+      &lt;button onClick={toggleImportance}&gt;{label}&lt;/button&gt;
+    &lt;/li&gt;
+  )
+}
+
+export default Note</code></pre>
+      </div>
+      <p><code class="inline">App.jsx</code> is the biggest file: it owns <code class="inline">notes</code>, <code class="inline">newNote</code>, and <code class="inline">showAll</code> state, fetches notes in a <code class="inline">useEffect</code> on mount, and defines <code class="inline">toggleImportanceOf</code> and <code class="inline">addNote</code> handlers that call into <code class="inline">noteService</code>. Nothing about that shape is wrong for a Vite SPA — it's exactly what the course teaches at this point. Some of it stops being appropriate once the same code moves into a framework with a server half, which is what most of this walkthrough is about.</p>
+    </section>
+
+    <section id="audit">
+      <h2>What's worth fixing along the way</h2>
+      <p>Before touching any files, it's worth naming the things in the original code that a straight line-for-line port would happily carry forward unchanged — some are Next.js-specific opportunities, others are just rough edges from a learning exercise:</p>
+      <table>
+        <thead><tr><th>Issue</th><th>Where</th><th>Why it's worth fixing here</th></tr></thead>
+        <tbody>
+          <tr><td>Initial notes fetched client-side in <code class="inline">useEffect</code></td><td><code class="inline">App.jsx</code></td><td>Next.js can fetch this on the server before any HTML is sent — no loading flicker, no client-side round trip, less JS shipped to the browser</td></tr>
+          <tr><td>Hardcoded absolute URL <code class="inline">http://localhost:3001/notes</code></td><td><code class="inline">services/notes.js</code></td><td>Frontend and backend now live in the same app on the same origin — a relative path works everywhere, dev and production alike, with no CORS setup</td></tr>
+          <tr><td><code class="inline">axios</code> dependency</td><td><code class="inline">services/notes.js</code></td><td>The Web-standard <code class="inline">fetch</code> is already available in both Server and Client Components — nothing left for axios to add</td></tr>
+          <tr><td><code class="inline">useState('a new note...')</code></td><td><code class="inline">App.jsx</code></td><td>A real bug, not a style nit: submit the form without touching the input and you save a note whose content is the literal placeholder text</td></tr>
+          <tr><td>Large blocks of commented-out JSX and narrated <code class="inline">//</code> comments explaining what <code class="inline">useEffect</code>/promises are</td><td>throughout <code class="inline">App.jsx</code></td><td>Useful the first time you meet the concept; dead weight in code you intend to keep. Delete rather than carry forward.</td></tr>
+          <tr><td>No types anywhere</td><td>all files</td><td>This project is TypeScript end to end — an untyped <code class="inline">note</code> object flowing through five functions is exactly the situation types exist for</td></tr>
+        </tbody>
+      </table>
+      <p>None of these are exotic fixes — they're the same review comments this code would get in any TypeScript codebase. The Next.js migration is just a natural point to make them, since several files are being rewritten anyway.</p>
+    </section>
+
+    <section id="layout">
+      <h2>Where the files land</h2>
+      <table>
+        <thead><tr><th>part2/src</th><th>Next.js project</th><th>Role</th></tr></thead>
+        <tbody>
+          <tr><td><code class="inline">main.jsx</code></td><td><em>(nothing — deleted)</em></td><td>Next.js owns the render root; there's no manual <code class="inline">ReactDOM.createRoot</code> call to write</td></tr>
+          <tr><td><code class="inline">App.jsx</code></td><td><code class="inline">app/page.tsx</code> + <code class="inline">app/components/NotesApp.tsx</code></td><td>Split into a Server Component (initial fetch) and a Client Component (state + handlers)</td></tr>
+          <tr><td><code class="inline">components/Note.jsx</code></td><td><code class="inline">app/components/Note.tsx</code></td><td>Same presentational role, now typed</td></tr>
+          <tr><td><code class="inline">services/notes.js</code></td><td><code class="inline">lib/notes.ts</code></td><td>Typed <code class="inline">fetch</code> wrappers, relative URLs, no axios</td></tr>
+        </tbody>
+      </table>
+      <p>This assumes the <code class="inline">app/api/notes/route.ts</code> and <code class="inline">app/api/notes/[id]/route.ts</code> backend built earlier in this part already exists in the same project — that's what makes the relative-URL approach in <a href="#step-fetch">step 4</a> possible at all.</p>
+    </section>
+
+    <section id="step-types">
+      <h3 class="step"><span class="step-num">1</span>Give the domain a type</h3>
+      <p>Nothing in the original code declares what a note actually looks like — it's implicit in how the object is used across four files. One <code class="inline">Note</code> interface, defined once, replaces that implicit contract:</p>
+      <div class="code-card next">
+        <div class="label">lib/notes.ts (top of file)</div>
+        <pre><code>export interface Note {
+  id: string
+  content: string
+  important: boolean
+}</code></pre>
+      </div>
+      <p>Every file below imports this instead of re-describing the shape. If the backend's shape ever changes, TypeScript will now point at every call site that needs updating instead of leaving it to a runtime surprise.</p>
+    </section>
+
+    <section id="step-server">
+      <h3 class="step"><span class="step-num">2</span>Fetch the initial notes on the server</h3>
+      <p>The original loads notes like this:</p>
+      <div class="code-card express">
+        <div class="label">part2/src/App.jsx (excerpt)</div>
+        <pre><code>const [notes, setNotes] = useState([])
+
+const hook = () =&gt; {
+  noteService
+    .getAll()
+    .then(initialNotes =&gt; {
+      setNotes(initialNotes)
+    })
+}
+
+useEffect(hook, [])</code></pre>
+      </div>
+      <p>This is the textbook shape for "fetch data when a component mounts" in a client-only React app, and it's exactly what the <a href="https://react.dev/learn/you-might-not-need-an-effect">You Might Not Need an Effect</a> guide flags as unnecessary once there's somewhere else for the fetch to happen. In a Next.js project there is: <code class="inline">app/page.tsx</code> is a Server Component by default, which means it can simply <code class="inline">await</code> data before returning any JSX at all — no empty initial render, no effect, no <code class="inline">useState</code> just to hold data that's known before the page ever reaches the browser.</p>
+      <div class="note">
+        <span class="note-label">Don't fetch your own API over HTTP from a Server Component</span>
+        The tempting move is <code class="inline">await fetch('/api/notes')</code> straight from <code class="inline">page.tsx</code> — but Server Components have no implicit origin the way a browser tab does, so a relative URL doesn't resolve, and an absolute one means a real network round-trip to yourself for data your own process already has in memory. The better shape: pull the data-access code the route handler uses into a shared module, and have both the route handler <em>and</em> the page import it directly.
+      </div>
+      <p>That means one small refactor to the backend built earlier in this part — move the in-memory <code class="inline">notes</code> array and its helpers out of <code class="inline">app/api/notes/route.ts</code> and into <code class="inline">lib/notes-store.ts</code>, then have the route handler import from there instead of declaring it inline:</p>
+      <div class="code-card next">
+        <div class="label">lib/notes-store.ts</div>
+        <pre><code>import type { Note } from './notes'
+
+export let notes: Note[] = [
+  { id: '1', content: 'HTML is easy', important: true },
+  { id: '2', content: 'Browser can execute only JavaScript', important: false },
+  { id: '3', content: 'GET and POST are the most important methods of HTTP protocol', important: true },
+]
+
+export const getAll = async (): Promise&lt;Note[]&gt; =&gt; notes</code></pre>
+      </div>
+      <p>With that in place, <code class="inline">page.tsx</code> becomes an <code class="inline">async</code> function that awaits the data directly — the same pattern the Next.js data-fetching guide recommends for Server Components reading from a database or ORM, just applied to an in-memory store here:</p>
+      <div class="code-card next">
+        <div class="label">app/page.tsx</div>
+        <pre><code>import { getAll } from '../lib/notes-store'
+import NotesApp from './components/NotesApp'
+
+export default async function Page() {
+  const initialNotes = await getAll()
+  return &lt;NotesApp initialNotes={initialNotes} /&gt;
+}</code></pre>
+      </div>
+      <p>The <code class="inline">notes</code> variable is exported as <code class="inline">let</code>, not <code class="inline">const</code>, for the same reason as in the earlier Route Handlers chapter of these notes: the <code class="inline">DELETE</code>/<code class="inline">POST</code> handlers reassign it via <code class="inline">.filter()</code>/<code class="inline">.concat()</code>.</p>
+    </section>
+
+    <section id="step-client">
+      <h3 class="step"><span class="step-num">3</span>Draw the server/client boundary</h3>
+      <p>Everything past the initial fetch in the original — the <code class="inline">newNote</code> input, the <code class="inline">showAll</code> toggle, <code class="inline">toggleImportanceOf</code>, <code class="inline">addNote</code> — is genuinely interactive: state, event handlers, a controlled input. That's precisely the "when you need interactivity" criterion Next.js uses to decide something belongs in a Client Component, so it becomes one file, marked with the <code class="inline">'use client'</code> directive, that receives the server-fetched notes as a prop rather than fetching them itself:</p>
+      <div class="code-card next">
+        <div class="label">app/components/NotesApp.tsx</div>
+        <pre><code>'use client'
+
+import { useState } from 'react'
+import Note from './Note'
+import { createNote, updateNote } from '../../lib/notes'
+import type { Note as NoteType } from '../../lib/notes'
+
+export default function NotesApp({ initialNotes }: { initialNotes: NoteType[] }) {
+  const [notes, setNotes] = useState(initialNotes)
+  const [newNote, setNewNote] = useState('')
+  const [showAll, setShowAll] = useState(true)
+
+  const toggleImportanceOf = (id: string) =&gt; {
+    const note = notes.find(n =&gt; n.id === id)
+    if (!note) return
+    const changedNote = { ...note, important: !note.important }
+
+    updateNote(id, changedNote)
+      .then(updatedNote =&gt; {
+        setNotes(notes.map(n =&gt; (n.id === id ? updatedNote : n)))
+      })
+      .catch(() =&gt; {
+        alert(`the note '${note.content}' was already deleted from server`)
+        setNotes(notes.filter(n =&gt; n.id !== id))
+      })
+  }
+
+  const addNote = (event: React.FormEvent) =&gt; {
+    event.preventDefault()
+    createNote({ content: newNote, important: Math.random() &lt; 0.5 }).then(createdNote =&gt; {
+      setNotes(notes.concat(createdNote))
+      setNewNote('')
+    })
+  }
+
+  const notesToShow = showAll ? notes : notes.filter(n =&gt; n.important)
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Notes&lt;/h1&gt;
+      &lt;ul&gt;
+        {notesToShow.map(note =&gt; (
+          &lt;Note key={note.id} note={note} toggleImportance={() =&gt; toggleImportanceOf(note.id)} /&gt;
+        ))}
+      &lt;/ul&gt;
+      &lt;form onSubmit={addNote}&gt;
+        &lt;input value={newNote} onChange={e =&gt; setNewNote(e.target.value)} placeholder="a new note..." /&gt;
+        &lt;button type="submit"&gt;save&lt;/button&gt;
+      &lt;/form&gt;
+      &lt;button onClick={() =&gt; setShowAll(!showAll)}&gt;Show {showAll ? 'Important' : 'All'}&lt;/button&gt;
+    &lt;/div&gt;
+  )
+}</code></pre>
+      </div>
+      <p>Compare this to the original's <code class="inline">App.jsx</code>: every hook, every handler, the controlled-input pattern, the <code class="inline">key</code>-per-list-item — all identical in substance. The <code class="inline">'use client'</code> line at the top is the entire structural change needed to make this component interactive inside a Next.js page; everything React already taught you about state and events in part 1 and 2 still applies unmodified once you're inside a Client Component.</p>
+      <div class="note">
+        <span class="note-label">Why the boundary sits here and not higher</span>
+        <code class="inline">page.tsx</code> stays a plain Server Component — it does one thing, fetch and hand off — rather than being marked <code class="inline">'use client'</code> itself. Pushing the boundary as far down the tree as possible (onto <code class="inline">NotesApp</code>, not onto <code class="inline">page.tsx</code>) is the pattern the Next.js docs recommend: less of the app opts out of server rendering, and less JavaScript ships to the browser for parts of the page that never needed to be interactive.
+      </div>
+    </section>
+
+    <section id="step-fetch">
+      <h3 class="step"><span class="step-num">4</span>Retire axios and the hardcoded URL</h3>
+      <p>The original service module does two things worth reconsidering now that frontend and backend are one deployable: it depends on axios for what <code class="inline">fetch</code> already does natively, and it hardcodes an absolute URL that assumes the backend runs on a separate origin and port.</p>
+      <div class="compare">
+        <div class="code-card express">
+          <div class="label">part2/src/services/notes.js</div>
+          <pre><code>import axios from 'axios'
+const baseUrl = 'http://localhost:3001/notes'
+
+const create = newObject =&gt; {
+  const request = axios.post(baseUrl, newObject)
+  return request.then(response =&gt; response.data)
+}</code></pre>
+        </div>
+        <div class="code-card next">
+          <div class="label">lib/notes.ts</div>
+          <pre><code>export async function createNote(newNote: Omit&lt;Note, 'id'&gt;): Promise&lt;Note&gt; {
+  const response = await fetch('/api/notes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(newNote),
+  })
+  return response.json()
+}</code></pre>
+        </div>
+      </div>
+      <p>Both changes come from the same underlying fact: this frontend and its backend are now the same Next.js app, served from the same origin. A relative path like <code class="inline">/api/notes</code> resolves correctly wherever the app is running — <code class="inline">localhost:3000</code> in development, whatever domain it's deployed to in production — with no environment-specific base URL to configure and no CORS headers to add on the backend, both of which the two-separate-servers setup in part 2/3 needed. And since this file only ever runs in the browser (it's imported exclusively by the <code class="inline">'use client'</code> component), the Web-standard <code class="inline">fetch</code> the browser already ships is all it needs — nothing for axios to add.</p>
+      <p>The full module, typed and axios-free:</p>
+      <div class="code-card next">
+        <div class="label">lib/notes.ts</div>
+        <pre><code>export interface Note {
+  id: string
+  content: string
+  important: boolean
+}
+
+export async function getAllNotes(): Promise&lt;Note[]&gt; {
+  const response = await fetch('/api/notes')
+  return response.json()
+}
+
+export async function createNote(newNote: Omit&lt;Note, 'id'&gt;): Promise&lt;Note&gt; {
+  const response = await fetch('/api/notes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(newNote),
+  })
+  return response.json()
+}
+
+export async function updateNote(id: string, updated: Note): Promise&lt;Note&gt; {
+  const response = await fetch(`/api/notes/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updated),
+  })
+  return response.json()
+}</code></pre>
+      </div>
+      <div class="warn">
+        <span class="warn-label">One real behavior change, not just a rename</span>
+        The original used <code class="inline">axios.patch</code> for toggling importance; the method above uses <code class="inline">PUT</code>. That's a deliberate call, not an accident — <code class="inline">PATCH</code> (partial update) support isn't part of the <code class="inline">app/api/notes/[id]/route.ts</code> backend built earlier in this part, only <code class="inline">GET</code> and <code class="inline">DELETE</code> are. Wiring up importance-toggling end to end — the route handler, the verb, all of it — is exactly what the exercise at the end of this page asks you to defer, so <code class="inline">updateNote</code> here is written for when that exists, not called yet.
+      </div>
+      <p><code class="inline">getAllNotes</code> is kept in this module too, even though <code class="inline">page.tsx</code> no longer needs it (it reads <code class="inline">lib/notes-store.ts</code> directly, per <a href="#step-server">step 2</a>) — it's there so any future Client Component that needs to re-fetch the full list (after a delete, say) has a typed helper ready, without reintroducing the server-side self-fetch problem, since this one only ever runs in the browser.</p>
+    </section>
+
+    <section id="step-cleanup">
+      <h3 class="step"><span class="step-num">5</span>Fix the input bug and clean up</h3>
+      <p>Two small but real fixes, both visible in the <code class="inline">NotesApp.tsx</code> listing above already — called out here explicitly since they're easy to port over by accident if you're translating line-by-line instead of re-reading each line:</p>
+      <div class="fix">
+        <span class="fix-label">Fix — placeholder text as initial state</span>
+        <pre><code><span class="comment">// original — submits the literal string if the user never types anything</span>
+const [newNote, setNewNote] = useState('a new note...')
+
+<span class="comment">// fixed — real placeholder UX belongs on the &lt;input&gt;, not in the state</span>
+const [newNote, setNewNote] = useState('')
+<span class="comment">// ...</span>
+&lt;input value={newNote} onChange={e =&gt; setNewNote(e.target.value)} placeholder="a new note..." /&gt;</code></pre>
+      </div>
+      <div class="fix">
+        <span class="fix-label">Fix — delete the narration</span>
+        <p>The original <code class="inline">App.jsx</code> carries roughly 25 lines of commented-out JSX (an earlier, pre-<code class="inline">map</code> version of the list) and inline comments explaining what promises, effects, and controlled components are. Both were genuinely useful the first time through — that's exactly why they're comments and not deleted code in the original teaching material. Neither belongs in the version you keep: dead code invites someone to wonder if it's meant to come back, and comments narrating well-known React concepts just go stale as the surrounding code changes. None of it appears in the <code class="inline">NotesApp.tsx</code> listing above.</p>
+      </div>
+    </section>
+
+    <section id="step-split">
+      <h3 class="step"><span class="step-num">6</span>Split out the Note component</h3>
+      <p>This one barely changes — it's a good example of code that was already in decent shape and just needs types:</p>
+      <div class="compare">
+        <div class="code-card express">
+          <div class="label">part2/src/components/Note.jsx</div>
+          <pre><code>const Note = ({ note, toggleImportance }) =&gt; {
+  const label = note.important
+    ? 'make not important' : 'make important'
+
+  return (
+    &lt;li&gt;
+      {note.content}
+      &lt;button onClick={toggleImportance}&gt;{label}&lt;/button&gt;
+    &lt;/li&gt;
+  )
+}
+
+export default Note</code></pre>
+        </div>
+        <div class="code-card next">
+          <div class="label">app/components/Note.tsx</div>
+          <pre><code>import type { Note as NoteType } from '../../lib/notes'
+
+export default function Note({
+  note,
+  toggleImportance,
+}: {
+  note: NoteType
+  toggleImportance: () =&gt; void
+}) {
+  const label = note.important ? 'make not important' : 'make important'
+
+  return (
+    &lt;li&gt;
+      {note.content}
+      &lt;button onClick={toggleImportance}&gt;{label}&lt;/button&gt;
+    &lt;/li&gt;
+  )
+}</code></pre>
+        </div>
+      </div>
+      <div class="note">
+        <span class="note-label">No <code class="inline">'use client'</code> needed here</span>
+        <code class="inline">Note.tsx</code> has no state, no hooks, no browser APIs of its own — by the criteria from <a href="#step-client">step 3</a> it wouldn't need to be a Client Component even on its own. It doesn't need the directive anyway: any component rendered underneath a <code class="inline">'use client'</code> boundary (here, <code class="inline">NotesApp</code>) is part of that client tree automatically. The directive only needs to mark the <em>topmost</em> file where the client boundary begins.
+      </div>
+    </section>
+
+    <section id="full-listing">
+      <h3 class="step"><span class="step-num">7</span>The full picture</h3>
+      <p>Four files, the same count as the original, doing the same job:</p>
+      <table>
+        <thead><tr><th>File</th><th>Server or Client</th><th>Responsibility</th></tr></thead>
+        <tbody>
+          <tr><td><code class="inline">app/page.tsx</code></td><td>Server</td><td>Fetches initial notes, hands them to <code class="inline">NotesApp</code></td></tr>
+          <tr><td><code class="inline">app/components/NotesApp.tsx</code></td><td>Client</td><td>All state, all handlers — the interactive heart of the app</td></tr>
+          <tr><td><code class="inline">app/components/Note.tsx</code></td><td>(inherits Client)</td><td>Presentational: one note, one toggle button</td></tr>
+          <tr><td><code class="inline">lib/notes.ts</code></td><td>Client-only helpers</td><td>Typed <code class="inline">fetch</code> wrappers for mutations, plus the shared <code class="inline">Note</code> type</td></tr>
+          <tr><td><code class="inline">lib/notes-store.ts</code></td><td>Server-only</td><td>The in-memory data itself, shared by <code class="inline">page.tsx</code> and the existing <code class="inline">app/api/notes</code> route handlers</td></tr>
+        </tbody>
+      </table>
+      <p>Nothing here introduces a concept beyond what part 1 and 2 already covered about React itself — state, props, controlled inputs, lists and keys are all unchanged. What changed is entirely about <em>where code runs</em>: less of it needed to run in the browser at all, and the part that does no longer needs to know or care what port the backend lives on.</p>
+    </section>
+
+    <section id="exercise">
+      <h2>Exercise</h2>
+      <div class="exercise">
+        <h4><span class="tag">3.9</span>Notes backend step 9</h4>
+        <p>Make the backend built earlier in this part (<code class="inline">app/api/notes/route.ts</code> and <code class="inline">app/api/notes/[id]/route.ts</code>) work with the converted notes frontend above.</p>
+        <p>Do not implement the functionality for toggling a note's importance yet — that needs a <code class="inline">PUT</code> or <code class="inline">PATCH</code> export on the <code class="inline">[id]</code> route that doesn't exist yet, and wiring that up properly (with the right status codes for a missing or malformed id) is what a later exercise in this part covers. For now, verify that the initial list of notes renders via the server-fetched <code class="inline">lib/notes-store.ts</code>, and that adding a new note through the form actually reaches <code class="inline">POST /api/notes</code> and appears in the list without a page reload.</p>
+      </div>
+    </section>
+
+    <footer class="colophon">
+      Adapted from the Full Stack Open Part 2 notes frontend (React + Vite + axios) for Next.js 16 / TypeScript, building on the <code class="inline">app/api/notes</code> Route Handlers introduced earlier in this part. Framework specifics verified against <code class="inline">node_modules/next/dist/docs</code> in this project rather than assumed from memory.
+    </footer>
+  </main>
+</div>
+</body>
+</html>
